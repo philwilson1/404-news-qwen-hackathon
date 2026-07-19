@@ -1,0 +1,14 @@
+# Frontend
+404News/node_modules/
+404News/.env
+404News/.env.local
+404News/dist/
+
+# Backend
+Qwen-Agent/__pycache__/
+Qwen-Agent/*.pyc
+Qwen-Agent/venv/
+Qwen-Agent/.env
+
+# General
+.DS_Store

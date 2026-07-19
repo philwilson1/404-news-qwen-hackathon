@@ -1,0 +1,84 @@
+import os
+import re
+from datetime import datetime, timezone
+from supabase import create_client, Client
+from scraper import fetch_articles
+
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    raise SystemExit(
+        "Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables.\n"
+        "Set them in your terminal first, then re-run this script."
+    )
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+
+def slugify_tag(source: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '-', source.lower()).strip('-') or "general"
+
+
+def to_article_row(raw: dict) -> dict:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return {
+        "title": raw.get("title", "").strip()[:300],
+        "summary": raw.get("summary", "").strip()[:600],
+        "source": raw.get("source", "Unknown Source"),
+        "source_logo": "",
+        "author": raw.get("source", "Staff"),
+        "vibe": "deep-dives",
+        "tag": slugify_tag(raw.get("source", "general")),
+        "verified": True,
+        "confidence": 0.8,
+        "image_url": "",
+        "views": "0",
+        "trending": False,
+        "published_at": raw.get("published") or now_iso,
+        "read_time": 3,
+        "agent_log": [
+            {"agent": "scraper", "status": "completed", "detail": f"Pulled from {raw.get('source')}"},
+        ],
+        "created_at": now_iso,
+    }
+
+
+def get_existing_titles() -> set:
+    try:
+        res = supabase.table("articles").select("title").execute()
+        return {row["title"] for row in (res.data or [])}
+    except Exception as e:
+        print(f"[warn] Could not fetch existing titles: {e}")
+        return set()
+
+
+def main():
+    print("Fetching real articles from RSS sources...")
+    raw_articles = fetch_articles(force=True)
+    print(f"Fetched {len(raw_articles)} raw articles.")
+
+    if not raw_articles:
+        print("No articles fetched — check your internet connection or RSS feed URLs in scraper.py.")
+        return
+
+    existing_titles = get_existing_titles()
+    new_rows = [
+        to_article_row(a) for a in raw_articles
+        if a.get("title") and a["title"].strip() not in existing_titles
+    ]
+
+    if not new_rows:
+        print("No new articles to insert — everything already exists in the table.")
+        return
+
+    print(f"Inserting {len(new_rows)} new articles into Supabase...")
+    try:
+        result = supabase.table("articles").insert(new_rows).execute()
+        print(f"Success! Inserted {len(result.data)} articles.")
+    except Exception as e:
+        print(f"[error] Insert failed: {e}")
+
+
+if __name__ == "__main__":
+    main()
