@@ -1,0 +1,60 @@
+<svg width="680" height="620" viewBox="0 0 680 620" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>404 News architecture diagram</title>
+<desc>Shows the data flow from RSS sources through the scraper into Supabase, then to the React frontend, Flask backend, and Qwen Cloud for AI inference, with the streamed response returning to the frontend.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#3d3d3a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect width="680" height="620" fill="#ffffff"/>
+
+<g>
+<rect x="190" y="30" width="300" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="340" y="52" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">RSS news sources</text>
+</g>
+<line x1="340" y1="74" x2="340" y2="114" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="190" y="114" width="300" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="132" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#26215C">scraper.py</text>
+<text x="340" y="150" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#3C3489">Fetches + parses live articles</text>
+</g>
+<line x1="340" y1="170" x2="340" y2="210" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="190" y="210" width="300" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text x="340" y="228" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#04342C">Supabase</text>
+<text x="340" y="246" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#085041">Stores articles + chat history</text>
+</g>
+<line x1="340" y1="266" x2="340" y2="306" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="20" y="312" width="150" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text x="95" y="334" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#2C2C2A">User (browser)</text>
+</g>
+<line x1="170" y1="334" x2="190" y2="334" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="190" y="306" width="300" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="324" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#26215C">React frontend</text>
+<text x="340" y="342" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#3C3489">Vite + feed/chat UI</text>
+</g>
+<line x1="340" y1="362" x2="340" y2="402" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<g>
+<rect x="190" y="402" width="300" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text x="340" y="420" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#26215C">Flask backend (Qwen-Agent)</text>
+<text x="340" y="438" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#3C3489">/chat endpoint, streams responses</text>
+</g>
+<line x1="340" y1="458" x2="340" y2="506" stroke="#3d3d3a" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<rect x="170" y="470" width="340" height="112" rx="16" fill="none" stroke="#888780" stroke-width="1" stroke-dasharray="4 4"/>
+<text x="182" y="490" font-family="sans-serif" font-size="12" fill="#5F5E5A">Alibaba Cloud (Qwen Cloud)</text>
+
+<g>
+<rect x="190" y="506" width="300" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text x="340" y="524" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="14" font-weight="500" fill="#4A1B0C">Qwen Cloud (Alibaba)</text>
+<text x="340" y="542" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-size="12" fill="#712B13">qwen3.6-flash inference</text>
+</g>
+
+<path d="M490,534 C610,534 610,334 490,334" fill="none" stroke="#D85A30" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+<text x="500" y="430" font-family="sans-serif" font-size="12" fill="#5F5E5A">Streamed response</text>
+</svg>
