@@ -8,3 +8,4 @@ supabase
 feedparser
 numpy
 python-dateutil
+soundfile
