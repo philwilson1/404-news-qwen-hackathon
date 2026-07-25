@@ -1,0 +1,8 @@
+flask
+flask-cors
+gunicorn
+qwen-agent
+openai
+dashscope
+supabase
+feedparser

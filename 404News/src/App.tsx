@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import BottomNav, { type Tab } from './components/BottomNav';
 import SideDrawer from './components/SideDrawer';
@@ -6,11 +6,24 @@ import FeedView from './components/FeedView';
 import AIView from './components/AIView';
 import ProfileView from './components/ProfileView';
 import Toast, { type ToastState } from './components/Toast';
+import AuthView from './components/AuthView';
+import { getCurrentUser, onAuthChange, type AuthUser } from './lib/supabase';
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('feed');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    getCurrentUser().then((u) => {
+      setUser(u);
+      setAuthLoading(false);
+    });
+    const unsubscribe = onAuthChange((u) => setUser(u));
+    return unsubscribe;
+  }, []);
 
   const showLockedToast = useCallback(() => {
     setToast({
@@ -22,6 +35,20 @@ function App() {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
+  // Still checking whether a session exists — avoid flashing the login screen unnecessarily
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-zinc-700 border-t-sky-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Not logged in — show the auth screen instead of the app
+  if (!user) {
+    return <AuthView />;
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-md min-h-screen bg-zinc-950 relative shadow-2xl">
@@ -29,7 +56,7 @@ function App() {
         <main>
           {activeTab === 'feed' && <FeedView />}
           {activeTab === 'ai' && <AIView />}
-          {activeTab === 'profile' && <ProfileView />}
+          {activeTab === 'profile' && <ProfileView user={user} />}
         </main>
         <BottomNav active={activeTab} onChange={setActiveTab} />
       </div>

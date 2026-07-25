@@ -20,7 +20,7 @@ export default function SideDrawer({ open, onClose, onLockedCategory }: { open: 
           <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
         </div>
         <div className="p-4 overflow-y-auto no-scrollbar h-[calc(100%-73px)]">
-          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">PivotAI System</p>
+          <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">404 NewsAi System</p>
           <div className="flex items-center gap-2 p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 mb-4">
             <span className="flex h-2 w-2 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" /></span>
             <span className="text-white text-sm font-semibold">All Systems Operational</span>
