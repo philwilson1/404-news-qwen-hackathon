@@ -6,3 +6,5 @@ openai
 dashscope
 supabase
 feedparser
+numpy
+python-dateutil
