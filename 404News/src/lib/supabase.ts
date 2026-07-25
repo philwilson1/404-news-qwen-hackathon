@@ -132,8 +132,8 @@ export async function toggleBookmark(article: Article, isBookmarked: boolean): P
         .eq('article_id', article.id)
         .eq('user_id', user.id);
     } else {
-      await c.from('bookmarks').insert({ 
-        article_id: article.id, 
+      await c.from('bookmarks').insert({
+        article_id: article.id,
         title: article.title,
         user_id: user.id
       });
@@ -207,8 +207,8 @@ export async function runPipeline(articles: Article[]): Promise<AgentRun[]> {
 
 function streamDemo(onToken: (t: string) => void, onDone: () => void, articles: Article[]) {
   const top = articles.slice(0, 5);
-  const text = top.length 
-    ? `Here's your AI pulse for today:\n\n${top.map((a, i) => `**${i + 1}. ${a.title.split(' — ')[0]}** — ${a.summary.split('.')[0]}. (Source: ${a.source})`).join('\n\n')}\n\nEvery story above was verified by 2+ independent sources.` 
+  const text = top.length
+    ? `Here's your AI pulse for today:\n\n${top.map((a, i) => `**${i + 1}. ${a.title.split(' — ')[0]}** — ${a.summary.split('.')[0]}. (Source: ${a.source})`).join('\n\n')}\n\nEvery story above was verified by 2+ independent sources.`
     : "I'm 404 AI, your news assistant. Ask me about today's top stories.";
   (async () => {
     for (const tok of text.split(/(\s+)/)) {
@@ -227,56 +227,63 @@ export async function streamQwenChat(
   _onError: (err: string) => void
 ): Promise<void> {
   try {
-    const res = await fetch('http://127.0.0.1:5000/chat', {
+    // Attach the current session's auth token so the backend can verify who's calling
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const res = await fetch('https://four04-news.onrender.com/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        messages, 
-        articles: contextArticles.slice(0, 5).map((a) => ({ 
-          title: a.title, 
-          summary: a.summary, 
-          source: a.source 
-        })), 
-        stream: true 
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        messages,
+        articles: contextArticles.slice(0, 5).map((a) => ({
+          title: a.title,
+          summary: a.summary,
+          source: a.source
+        })),
+        stream: true
       }),
     });
 
     if (!res.ok || !res.body) throw new Error('bad response');
-    
-    const reader = res.body.getReader(); 
-    const dec = new TextDecoder(); 
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
     let buf = '';
 
-    while (true) { 
-      const { done, value } = await reader.read(); 
-      if (done) break; 
-      
-      buf += dec.decode(value, { stream: true }); 
-      const lines = buf.split('\n'); 
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
       buf = lines.pop() ?? '';
-      
-      for (const line of lines) { 
-        const t = line.trim(); 
-        if (!t.startsWith('data: ')) continue; 
-        const p = t.slice(6); 
-        
-        if (p === '[DONE]') { 
-          onDone(); 
-          return; 
-        } 
-        
-        try { 
+
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data: ')) continue;
+        const p = t.slice(6);
+
+        if (p === '[DONE]') {
+          onDone();
+          return;
+        }
+
+        try {
           const parsed = JSON.parse(p);
-          const tok = parsed.choices?.[0]?.delta?.content || parsed.content || ""; 
-          if (tok) onToken(tok); 
+          const tok = parsed.choices?.[0]?.delta?.content || parsed.content || "";
+          if (tok) onToken(tok);
         } catch {
           if (p) onToken(p);
-        } 
-      } 
-    } 
+        }
+      }
+    }
     onDone();
-  } catch (err) { 
+  } catch (err) {
     console.error("Local chat error, falling back to demo stream:", err);
-    streamDemo(onToken, onDone, contextArticles); 
+    streamDemo(onToken, onDone, contextArticles);
   }
 }

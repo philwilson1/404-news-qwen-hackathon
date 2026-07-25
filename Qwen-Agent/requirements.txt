@@ -9,3 +9,4 @@ feedparser
 numpy
 python-dateutil
 soundfile
+flask-limiter

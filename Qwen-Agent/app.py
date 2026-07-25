@@ -2,14 +2,54 @@ import os
 import json
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from qwen_agent.agents import Assistant
+from supabase import create_client
 
 os.environ.setdefault("DASHSCOPE_API_KEY", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")  # publishable key — safe here, used only to verify tokens
 
 app = Flask(__name__)
-CORS(app)
 
-# Remove/delete the old dashscope.base_http_api_url line entirely — not needed here
+# ============================================
+# CORS — locked to known frontend origins only, not wide open to anyone
+# ============================================
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://404-news-qwen-hackathon.vercel.app",
+]
+CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
+
+# ============================================
+# Rate limiting — protects Qwen Cloud token usage from abuse
+# ============================================
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
+# Supabase client used ONLY to verify incoming user tokens — no data writes happen through this
+_auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
+
+
+def get_verified_user_id():
+    """Returns the caller's user id if their Bearer token is valid, else None."""
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1]
+    if not _auth_client:
+        return None
+    try:
+        result = _auth_client.auth.get_user(token)
+        return result.user.id if result and result.user else None
+    except Exception:
+        return None
+
 
 llm_config = {
     'model': 'qwen3.6-flash',
@@ -18,11 +58,10 @@ llm_config = {
     'generate_cfg': {'temperature': 0.5}
 }
 
-
 news_agent = Assistant(
     llm=llm_config,
     system_message=(
-        "You are the Lead Presenter Agent for 404 News. Your job is to format "
+        "You are 404 AI, the Lead Presenter Agent for 404 News. Your job is to format "
         "raw text streams into clean, professional markdown summaries. "
         "Do not use emoji anywhere in your responses. Use only plain text, "
         "headers, bold text, and bullet points for formatting."
@@ -30,30 +69,31 @@ news_agent = Assistant(
 )
 
 
-
-# This creates an endpoint at http://127.0.0.1:5000/chat
 @app.route('/chat', methods=['POST', 'OPTIONS'])
+@limiter.limit("20 per hour")
 def chat():
-    # Handle the CORS preflight check immediately
     if request.method == 'OPTIONS':
         return '', 200
+
+    # Require a valid logged-in user for every real request
+    user_id = get_verified_user_id()
+    if not user_id:
+        return jsonify({'error': 'Unauthorized — please sign in.'}), 401
 
     data = request.json or {}
     frontend_messages = data.get('messages', [])
 
-    # Fallback in case a raw string 'message' was passed
     if not frontend_messages and 'message' in data:
         frontend_messages = [{'role': 'user', 'content': data['message']}]
 
     if not frontend_messages:
         return jsonify({'error': 'No messages found in request'}), 400
-# Format the messages array to the format Qwen-Agent expects
+
     qwen_messages = []
-    
-    # Check if articles are attached in the payload
+
     attached_articles = data.get('articles', [])
     context_injection = ""
-    
+
     if attached_articles:
         context_injection = "Context references for answering the prompt:\n"
         for art in attached_articles:
@@ -63,23 +103,21 @@ def chat():
         role = msg.get('role', 'user')
         if role not in ('user', 'assistant', 'system'):
             role = 'user'
-            
+
         content = msg.get('content', '')
-        
-        # Inject context into the final user statement to constrain Qwen's response
+
         if role == 'user' and i == len(frontend_messages) - 1 and context_injection:
             content = f"{context_injection}User Question: {content}"
-            
+
         qwen_messages.append({
             'role': role,
             'content': content
         })
-    
 
     @stream_with_context
     def generate():
         try:
-            print(f"Generator started. Sending to news_agent: {qwen_messages}")
+            print(f"Generator started for user {user_id}. Sending to news_agent: {qwen_messages}")
             sent_length = 0
 
             for response in news_agent.run(messages=qwen_messages):
@@ -124,6 +162,6 @@ def chat():
     return resp
 
 
-    if __name__ == '__main__':
-        port = int(os.environ.get('PORT', 5000))
-        app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
