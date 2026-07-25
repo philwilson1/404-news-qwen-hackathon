@@ -20,21 +20,22 @@ export interface AgentRun { id: string; agent_name: string; status: string; item
 export type AuthUser = User;
 
 // ============================================
-// CLIENT SETUP
+// CLIENT SETUP — single instance, created once, used everywhere.
+// Creating more than one client against the same localStorage session
+// causes them to race on token refresh and fail intermittently.
 // ============================================
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-let _db: SupabaseClient | null = null;
-function db(): SupabaseClient | null {
-  if (_db) return _db;
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-  try { _db = createClient(supabaseUrl, supabaseAnonKey); } catch { _db = null; }
-  return _db;
-}
+export const supabase: SupabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// db() now just returns the same single client, or null if not configured —
+// kept so existing calls to db() elsewhere in the file don't need to change.
+function db(): SupabaseClient | null {
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return supabase;
+}
 
 // ============================================
 // AUTH FUNCTIONS
@@ -227,7 +228,6 @@ export async function streamQwenChat(
   _onError: (err: string) => void
 ): Promise<void> {
   try {
-    // Attach the current session's auth token so the backend can verify who's calling
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;
 
