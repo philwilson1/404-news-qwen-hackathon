@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, CheckCircle2, Eye, Clock, ExternalLink, Send, Sparkles } from 'lucide-react';
-import { streamQwenChat, saveChatMessage, type Article } from '../lib/supabase';
+import { X, CheckCircle2, Eye, Clock, Send, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { supabase, saveChatMessage, type Article } from '../lib/supabase';
 
 interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; }
 
@@ -20,7 +20,7 @@ export default function ArticleDetail({ article, onClose }: {
         {
           id: 'system-init',
           role: 'assistant',
-          content: `Hi! I am PivotAI. I have fully indexed this article. Ask me any specific questions about it!`
+          content: `Hi! I am 404 AI. I have fully indexed this article. Ask me any specific questions about it!`
         }
       ]);
     }
@@ -42,34 +42,81 @@ export default function ArticleDetail({ article, onClose }: {
     const userMsg: DisplayMessage = { id: `u-${Date.now()}`, role: 'user', content: query };
     const assistantId = `a-${Date.now()}`;
     const assistantMsg: DisplayMessage = { id: assistantId, role: 'assistant', content: '' };
-    
+
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setSending(true);
 
-    // Explicitly pass only THIS article as context to the streaming function
-    streamQwenChat(
-      [{ role: 'user', content: query }],
-      [article], 
-      (token) => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m))
-        );
-      },
-      async () => {
-        const finalContent = await new Promise<string>((resolve) => {
-          setMessages((prev) => {
-            const msg = prev.find((m) => m.id === assistantId);
-            resolve(msg?.content ?? '');
-            return prev;
-          });
-        });
-        await saveChatMessage('assistant', finalContent, [article]);
-        setSending(false);
-      },
-      () => {
-        setSending(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const res = await fetch('https://four04-news.onrender.com/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: query }],
+          articles: [{ title: article.title, summary: article.summary, source: article.source }],
+          stream: true,
+        }),
+      });
+
+      if (!res.ok || !res.body) throw new Error('bad response');
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let finalContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const t = line.trim();
+          if (!t.startsWith('data: ')) continue;
+          const p = t.slice(6);
+
+          if (p === '[DONE]') {
+            await saveChatMessage('assistant', finalContent, [article]);
+            setSending(false);
+            return;
+          }
+
+          try {
+            const parsed = JSON.parse(p);
+            const tok = parsed.choices?.[0]?.delta?.content || parsed.content || '';
+            if (tok) {
+              finalContent += tok;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + tok } : m))
+              );
+            }
+          } catch {
+            if (p) {
+              finalContent += p;
+              setMessages((prev) =>
+                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + p } : m))
+              );
+            }
+          }
+        }
       }
-    );
+      await saveChatMessage('assistant', finalContent, [article]);
+      setSending(false);
+    } catch (err) {
+      console.error('Article chat error:', err);
+      setMessages((prev) =>
+        prev.map((m) => (m.id === assistantId ? { ...m, content: 'Sorry, something went wrong. Please try again.' } : m))
+      );
+      setSending(false);
+    }
   };
 
   return (
@@ -113,9 +160,11 @@ export default function ArticleDetail({ article, onClose }: {
               )}
               <span className="inline-flex items-center gap-1"><Eye size={12} /> {article.views}</span>
               <span className="inline-flex items-center gap-1"><Clock size={12} /> {article.read_time} min read</span>
-          <div className="text-zinc-300 text-sm leading-relaxed bg-zinc-900/40 p-3 rounded-xl border border-zinc-900 prose prose-invert prose-sm max-w-none">
-  <ReactMarkdown>{article.summary}</ReactMarkdown>
-</div>
+            </div>
+            <div className="text-zinc-300 text-sm leading-relaxed bg-zinc-900/40 p-3 rounded-xl border border-zinc-900 prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown>{article.summary}</ReactMarkdown>
+            </div>
+          </div>
 
           {/* Inline Contextual Chat */}
           <div className="pt-4 border-t border-zinc-900 flex flex-col flex-1 min-h-[300px]">
@@ -128,10 +177,12 @@ export default function ArticleDetail({ article, onClose }: {
                   <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${msg.role === 'user' ? 'bg-sky-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
                     {msg.role === 'assistant' && (
                       <div className="flex items-center gap-1.5 mb-1 text-sky-400 font-semibold">
-                        <Sparkles size={10} /> <span>PivotAI</span>
+                        <Sparkles size={10} /> <span>404 AI</span>
                       </div>
                     )}
-                    <p className="leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    <div className="leading-relaxed prose prose-invert prose-xs max-w-none">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -147,7 +198,7 @@ export default function ArticleDetail({ article, onClose }: {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder={`Ask about this story...`}
+              placeholder="Ask about this story..."
               disabled={sending}
               className="flex-1 bg-transparent text-white text-xs placeholder:text-zinc-600 outline-none px-2"
             />
@@ -160,7 +211,6 @@ export default function ArticleDetail({ article, onClose }: {
             </button>
           </div>
         </div>
-
       </div>
     </div>
   );
