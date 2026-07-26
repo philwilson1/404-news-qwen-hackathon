@@ -18,8 +18,11 @@ app = Flask(__name__)
 # ============================================
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
     "https://404-news-qwen-hackathon.vercel.app",
 ]
+
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
 # ============================================

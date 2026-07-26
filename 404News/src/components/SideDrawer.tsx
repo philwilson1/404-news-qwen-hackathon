@@ -16,7 +16,7 @@ export default function SideDrawer({ open, onClose, onLockedCategory }: { open: 
       <div className={`fixed inset-0 bg-black/60 z-40 transition-opacity ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
       <div className={`fixed top-0 left-0 h-full w-72 bg-zinc-950 border-r border-zinc-900 z-50 transition-transform duration-300 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between p-4 border-b border-zinc-900">
-          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center"><Zap size={16} className="text-white" fill="white" /></div><span className="text-white font-bold text-lg">Pivot<span className="text-sky-400">AI</span></span></div>
+          <div className="flex items-center gap-2"><div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center"><Zap size={16} className="text-white" fill="white" /></div><span className="text-white font-bold text-lg">404News<span className="text-sky-400">AI</span></span></div>
           <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white transition-colors"><X size={20} /></button>
         </div>
         <div className="p-4 overflow-y-auto no-scrollbar h-[calc(100%-73px)]">
