@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, CheckCircle2, Eye, Clock, ExternalLink, Send, Sparkles } from 'lucide-react';
 import { streamQwenChat, saveChatMessage, type Article } from '../lib/supabase';
+import ReactMarkdown from 'react-markdown';
 
 interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; }
 
@@ -112,11 +113,9 @@ export default function ArticleDetail({ article, onClose }: {
               )}
               <span className="inline-flex items-center gap-1"><Eye size={12} /> {article.views}</span>
               <span className="inline-flex items-center gap-1"><Clock size={12} /> {article.read_time} min read</span>
-            </div>
-            <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap bg-zinc-900/40 p-3 rounded-xl border border-zinc-900">
-              {article.summary}
-            </p>
-          </div>
+          <div className="text-zinc-300 text-sm leading-relaxed bg-zinc-900/40 p-3 rounded-xl border border-zinc-900 prose prose-invert prose-sm max-w-none">
+  <ReactMarkdown>{article.summary}</ReactMarkdown>
+</div>
 
           {/* Inline Contextual Chat */}
           <div className="pt-4 border-t border-zinc-900 flex flex-col flex-1 min-h-[300px]">
