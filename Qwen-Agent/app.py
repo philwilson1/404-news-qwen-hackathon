@@ -7,27 +7,25 @@ from flask_limiter.util import get_remote_address
 from qwen_agent.agents import Assistant
 from supabase import create_client
 
+from scraper import fetch_articles
+from insert_articles import to_article_row
+
 os.environ.setdefault("DASHSCOPE_API_KEY", "")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")  # publishable key — safe here, used only to verify tokens
+SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
+PIPELINE_SECRET = os.getenv("PIPELINE_SECRET")  # shared secret for automated/cron calls only
 
 app = Flask(__name__)
 
-# ============================================
-# CORS — locked to known frontend origins only, not wide open to anyone
-# ============================================
 ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175",
     "https://404-news-qwen-hackathon.vercel.app",
 ]
-
 CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
 
-# ============================================
-# Rate limiting — protects Qwen Cloud token usage from abuse
-# ============================================
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -35,12 +33,12 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
-# Supabase client used ONLY to verify incoming user tokens — no data writes happen through this
 _auth_client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY) if SUPABASE_URL and SUPABASE_ANON_KEY else None
+_service_client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_URL and SUPABASE_SERVICE_KEY else None
 
 
 def get_verified_user_id():
-    """Returns the caller's user id if their Bearer token is valid, else None."""
+    """For real, logged-in human users calling from the frontend."""
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         return None
@@ -52,6 +50,20 @@ def get_verified_user_id():
         return result.user.id if result and result.user else None
     except Exception:
         return None
+
+
+def is_valid_pipeline_secret():
+    """For automated callers (e.g. the GitHub Actions cron job) — no human user involved."""
+    provided = request.headers.get("X-Pipeline-Secret", "")
+    return bool(PIPELINE_SECRET) and provided == PIPELINE_SECRET
+
+
+def get_existing_titles_from(client) -> set:
+    try:
+        res = client.table("articles").select("title").execute()
+        return {row["title"] for row in (res.data or [])}
+    except Exception:
+        return set()
 
 
 llm_config = {
@@ -72,13 +84,52 @@ news_agent = Assistant(
 )
 
 
+@app.route('/run-pipeline', methods=['POST', 'OPTIONS'])
+@limiter.limit("10 per hour")
+def run_pipeline():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    # Allow EITHER a real logged-in user OR the automated pipeline secret
+    user_id = get_verified_user_id()
+    is_automated = is_valid_pipeline_secret()
+
+    if not user_id and not is_automated:
+        return jsonify({'error': 'Unauthorized — please sign in.'}), 401
+
+    if not _service_client:
+        return jsonify({'error': 'Pipeline not configured on the server.'}), 500
+
+    try:
+        raw_articles = fetch_articles(force=True)
+        if not raw_articles:
+            return jsonify({'inserted': 0, 'message': 'No articles fetched from sources.'}), 200
+
+        existing_titles = get_existing_titles_from(_service_client)
+        new_rows = [
+            to_article_row(a) for a in raw_articles
+            if a.get("title") and a["title"].strip() not in existing_titles
+        ]
+
+        if not new_rows:
+            return jsonify({'inserted': 0, 'message': 'No new articles — everything already exists.'}), 200
+
+        result = _service_client.table("articles").insert(new_rows).execute()
+        return jsonify({'inserted': len(result.data), 'message': f'Inserted {len(result.data)} new articles.'}), 200
+
+    except Exception as e:
+        print(f"PIPELINE ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/chat', methods=['POST', 'OPTIONS'])
 @limiter.limit("20 per hour")
 def chat():
     if request.method == 'OPTIONS':
         return '', 200
 
-    # Require a valid logged-in user for every real request
     user_id = get_verified_user_id()
     if not user_id:
         return jsonify({'error': 'Unauthorized — please sign in.'}), 401

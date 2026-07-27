@@ -1,0 +1,18 @@
+name: Auto-refresh news pipeline
+
+on:
+  schedule:
+    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC) = 4x/day
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}  # lets you also trigger it manually from the GitHub Actions tab
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the run-pipeline endpoint
+        run: |
+          curl -X POST "https://four04-news.onrender.com/run-pipeline" \
+            -H "X-Pipeline-Secret: ${{ secrets.PIPELINE_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --fail-with-body

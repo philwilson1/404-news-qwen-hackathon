@@ -19,7 +19,7 @@ export default function FeedView() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const handleRefresh = async () => { if (pipelineRunning || articles.length === 0) return; setPipelineRunning(true); try { await runPipeline(articles); await load(); } catch {} setTimeout(() => setPipelineRunning(false), 1500); };
+  const handleRefresh = async () => { if (pipelineRunning || articles.length === 0) return; setPipelineRunning(true); try { await runPipeline(); await load(); } catch {} setTimeout(() => setPipelineRunning(false), 1500); };
   const handleBookmark = async (article: Article, isBookmarked: boolean) => {
     await toggleBookmark(article, isBookmarked);
     setBookmarkedIds((prev) => { const next = new Set(prev); if (isBookmarked) next.delete(article.id); else next.add(article.id); return next; });

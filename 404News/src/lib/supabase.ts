@@ -192,19 +192,43 @@ export async function fetchAgentRuns(): Promise<AgentRun[]> {
   } catch { return fallbackAgentRuns as AgentRun[]; }
 }
 
-export async function runPipeline(articles: Article[]): Promise<AgentRun[]> {
-  const c = db(); if (!c) return fallbackAgentRuns as AgentRun[];
-  const now = new Date();
-  const vc = articles.filter((a) => a.verified).length;
+export async function runPipeline(): Promise<AgentRun[]> {
+  const c = db();
+  if (!c) return fallbackAgentRuns as AgentRun[];
+ 
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+ 
+    const res = await fetch('https://four04-news.onrender.com/run-pipeline', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+ 
+    const result = await res.json();
+ 
+    // Log a real status row reflecting what actually happened, for the UI's status feed
     await c.from('agent_runs').insert([
-      { agent_name: 'collector', status: 'completed', items_processed: articles.length, detail: `Scraped ${articles.length} items`, created_at: new Date(now.getTime() - 180000).toISOString() },
-      { agent_name: 'verification', status: 'completed', items_processed: articles.length, items_verified: vc, detail: `Verified ${vc} of ${articles.length}`, created_at: new Date(now.getTime() - 120000).toISOString() },
-      { agent_name: 'presenter', status: 'completed', items_processed: articles.length, items_verified: vc, items_published: articles.length, detail: `Published ${articles.length} articles`, created_at: new Date(now.getTime() - 60000).toISOString() },
+      {
+        agent_name: 'pipeline',
+        status: res.ok ? 'completed' : 'error',
+        items_processed: result.inserted ?? 0,
+        items_verified: result.inserted ?? 0,
+        items_published: result.inserted ?? 0,
+        detail: result.message || result.error || 'Pipeline run finished.',
+        created_at: new Date().toISOString(),
+      },
     ]);
-  } catch {}
+  } catch (err) {
+    console.error('Pipeline run failed:', err);
+  }
+ 
   return fetchAgentRuns();
 }
+
 
 function streamDemo(onToken: (t: string) => void, onDone: () => void, articles: Article[]) {
   const top = articles.slice(0, 5);
