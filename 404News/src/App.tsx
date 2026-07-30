@@ -5,6 +5,7 @@ import SideDrawer from './components/SideDrawer';
 import FeedView from './components/FeedView';
 import AIView from './components/AIView';
 import ProfileView from './components/ProfileView';
+import BookmarksView from './components/BookmarksView';
 import Toast, { type ToastState } from './components/Toast';
 import AuthView from './components/AuthView';
 import { getCurrentUser, onAuthChange, type AuthUser } from './lib/supabase';
@@ -15,6 +16,7 @@ function App() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [showBookmarks, setShowBookmarks] = useState(false);
 
   useEffect(() => {
     getCurrentUser().then((u) => {
@@ -35,7 +37,6 @@ function App() {
 
   const dismissToast = useCallback(() => setToast(null), []);
 
-  // Still checking whether a session exists — avoid flashing the login screen unnecessarily
   if (authLoading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
@@ -44,7 +45,6 @@ function App() {
     );
   }
 
-  // Not logged in — show the auth screen instead of the app
   if (!user) {
     return <AuthView />;
   }
@@ -54,9 +54,17 @@ function App() {
       <div className="mx-auto max-w-md min-h-screen bg-zinc-950 relative shadow-2xl">
         <Header onOpenDrawer={() => setDrawerOpen(true)} onSearchClick={() => {}} />
         <main>
-          {activeTab === 'feed' && <FeedView />}
-          {activeTab === 'ai' && <AIView />}
-          {activeTab === 'profile' && <ProfileView user={user} />}
+          {showBookmarks ? (
+            <BookmarksView onBack={() => setShowBookmarks(false)} />
+          ) : (
+            <>
+              {activeTab === 'feed' && <FeedView />}
+              {activeTab === 'ai' && <AIView />}
+              {activeTab === 'profile' && (
+                <ProfileView user={user} onOpenBookmarks={() => setShowBookmarks(true)} />
+              )}
+            </>
+          )}
         </main>
         <BottomNav active={activeTab} onChange={setActiveTab} />
       </div>

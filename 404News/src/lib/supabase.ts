@@ -311,3 +311,33 @@ export async function streamQwenChat(
     streamDemo(onToken, onDone, contextArticles);
   }
 }
+
+export async function fetchBookmarkedArticles(): Promise<Article[]> {
+  const c = db(); if (!c) return [];
+  try {
+    const user = await getCurrentUser();
+    if (!user) return [];
+
+    // 1. Get all article_ids bookmarked by this user
+    const { data: bookmarkRows, error: bmError } = await c
+      .from('bookmarks')
+      .select('article_id')
+      .eq('user_id', user.id);
+
+    if (bmError || !bookmarkRows || bookmarkRows.length === 0) return [];
+
+    const articleIds = bookmarkRows.map((b) => b.article_id);
+
+    // 2. Fetch full article details for those IDs from the articles table
+    const { data: articles, error: artError } = await c
+      .from('articles')
+      .select('*')
+      .in('id', articleIds);
+
+    if (artError || !articles) return [];
+    return articles as Article[];
+  } catch (err) {
+    console.error("Error fetching bookmarks:", err);
+    return [];
+  }
+}
