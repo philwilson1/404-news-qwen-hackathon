@@ -100,8 +100,11 @@ def run_pipeline():
     if not _service_client:
         return jsonify({'error': 'Pipeline not configured on the server.'}), 500
 
+  if not _service_client:
+        return jsonify({'error': 'Pipeline not configured on the server.'}), 500
+
     try:
-       raw_articles = fetch_articles(category="all", force=True)
+        raw_articles = fetch_articles(category="all", force=True)
         if not raw_articles:
             return jsonify({'inserted': 0, 'message': 'No articles fetched from sources.'}), 200
 
@@ -110,7 +113,6 @@ def run_pipeline():
             to_article_row(a) for a in raw_articles
             if a.get("title") and a["title"].strip() not in existing_titles
         ]
-
         if not new_rows:
             return jsonify({'inserted': 0, 'message': 'No new articles — everything already exists.'}), 200
 
