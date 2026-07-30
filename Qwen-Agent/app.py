@@ -101,7 +101,7 @@ def run_pipeline():
         return jsonify({'error': 'Pipeline not configured on the server.'}), 500
 
     try:
-        raw_articles = fetch_articles(force=True)
+       raw_articles = fetch_articles(category="all", force=True)
         if not raw_articles:
             return jsonify({'inserted': 0, 'message': 'No articles fetched from sources.'}), 200
 

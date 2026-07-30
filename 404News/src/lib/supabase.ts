@@ -10,6 +10,7 @@ export interface Article {
   author: string; vibe: string; tag: string; verified: boolean; confidence: number;
   image_url: string; views: string; trending: boolean; published_at: string;
   read_time: number; agent_log: AgentLogEntry[] | null; created_at: string;
+  category?: 'tech' | 'geopolitics' | 'startups' | string;
 }
 export interface AgentLogEntry { agent: string; status: string; detail: string; }
 export interface Bookmark { id: string; article_id: string; title: string; user_id?: string; created_at: string; }
@@ -94,15 +95,31 @@ export async function signOut(): Promise<void> {
 // DATA FUNCTIONS (USER SCOPED)
 // ============================================
 
-export async function fetchArticles(): Promise<Article[]> {
-  const c = db(); if (!c) return fallbackArticles;
-  try {
-    const { data, error } = await c.from('articles').select('*').order('created_at', { ascending: false });
-    if (error || !data?.length) return fallbackArticles;
-    return data as Article[];
-  } catch { return fallbackArticles; }
-}
+export async function fetchArticles(category?: string): Promise<Article[]> {
+  const c = db(); 
+  if (!c) return fallbackArticles;
 
+  try {
+    let query = c.from('articles').select('*').order('created_at', { ascending: false });
+    
+    // Filter by category if passed and not requesting 'all'
+    if (category && category !== 'all') {
+      query = query.ilike('category', category); // <--- Updated to .ilike()
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching articles:', error);
+      return fallbackArticles;
+    }
+
+    // Return the actual data (even if empty array []) so empty categories don't default to fallback AI news
+    return (data as Article[]) || [];
+  } catch { 
+    return fallbackArticles; 
+  }
+}
 export async function fetchBookmarks(): Promise<Bookmark[]> {
   const c = db(); if (!c) return [];
   try {
@@ -228,7 +245,6 @@ export async function runPipeline(): Promise<AgentRun[]> {
  
   return fetchAgentRuns();
 }
-
 
 function streamDemo(onToken: (t: string) => void, onDone: () => void, articles: Article[]) {
   const top = articles.slice(0, 5);

@@ -1,16 +1,48 @@
-import { X, Zap, ShieldCheck, FileText, PenTool, Github, Cpu, Lock, Trophy, Shirt, LineChart, GraduationCap } from 'lucide-react';
+import { 
+  X, Zap, ShieldCheck, FileText, PenTool, Github, Lock, 
+  Cpu, Globe, Rocket, Trophy, Shirt, LineChart, GraduationCap 
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 interface CategoryItem { id: string; label: string; icon: LucideIcon; locked: boolean; }
+
 const categories: CategoryItem[] = [
-  { id: 'ai-tech', label: 'AI & Technology', icon: Cpu, locked: false },
+  // Live Categories (Unlocked)
+  { id: 'tech', label: 'AI & Technology', icon: Cpu, locked: false },
+  { id: 'geopolitics', label: 'Geopolitics', icon: Globe, locked: false },
+  { id: 'startups', label: 'Startups & Funding', icon: Rocket, locked: false },
+
+  // Coming Soon (Locked)
   { id: 'sports', label: 'Sports', icon: Trophy, locked: true },
   { id: 'fashion', label: 'Fashion', icon: Shirt, locked: true },
   { id: 'finance', label: 'Finance', icon: LineChart, locked: true },
   { id: 'education', label: 'Education', icon: GraduationCap, locked: true },
 ];
 
-export default function SideDrawer({ open, onClose, onLockedCategory }: { open: boolean; onClose: () => void; onLockedCategory: () => void }) {
+interface SideDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  onLockedCategory: () => void;
+  activeCategory?: string;
+  onSelectCategory?: (category: string) => void;
+}
+
+export default function SideDrawer({ 
+  open, 
+  onClose, 
+  onLockedCategory,
+  activeCategory = 'tech',
+  onSelectCategory
+}: SideDrawerProps) {
+  const handleCategoryClick = (cat: CategoryItem) => {
+    if (cat.locked) {
+      onLockedCategory();
+    } else if (onSelectCategory) {
+      onSelectCategory(cat.id);
+      onClose(); // Automatically close drawer after selecting a live category
+    }
+  };
+
   return (
     <>
       <div className={`fixed inset-0 bg-black/60 z-40 transition-opacity ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
@@ -35,12 +67,29 @@ export default function SideDrawer({ open, onClose, onLockedCategory }: { open: 
           <div className="mt-6 pt-4 border-t border-zinc-900">
             <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Categories</p>
             <div className="space-y-1">
-              {categories.map((cat) => { const Icon = cat.icon; return (
-                  <button key={cat.id} onClick={() => cat.locked && onLockedCategory()} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${cat.locked ? 'bg-zinc-900/30 text-zinc-600 hover:bg-zinc-900/60' : 'bg-sky-500/10 border border-sky-500/20 text-sky-400'}`}>
-                    <Icon size={16} className={cat.locked ? 'text-zinc-700' : 'text-sky-400'} />
-                    <span className={`text-sm font-semibold flex-1 ${cat.locked ? 'text-zinc-600' : 'text-sky-400'}`}>{cat.label}</span>
+              {categories.map((cat) => { 
+                const Icon = cat.icon; 
+                const isActive = activeCategory === cat.id;
+
+                let buttonStyles = 'bg-zinc-900/30 text-zinc-400 hover:bg-zinc-900/60';
+                if (cat.locked) {
+                  buttonStyles = 'bg-zinc-900/30 text-zinc-600 hover:bg-zinc-900/60 cursor-not-allowed';
+                } else if (isActive) {
+                  buttonStyles = 'bg-sky-500/10 border border-sky-500/20 text-sky-400 font-semibold';
+                }
+
+                return (
+                  <button 
+                    key={cat.id} 
+                    onClick={() => handleCategoryClick(cat)} 
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${buttonStyles}`}
+                  >
+                    <Icon size={16} className={cat.locked ? 'text-zinc-700' : isActive ? 'text-sky-400' : 'text-zinc-400'} />
+                    <span className={`text-sm flex-1 ${cat.locked ? 'text-zinc-600' : isActive ? 'text-sky-400 font-semibold' : 'text-zinc-300'}`}>{cat.label}</span>
                     {cat.locked && <Lock size={13} className="text-zinc-700" />}
-                  </button> ); })}
+                  </button> 
+                ); 
+              })}
             </div>
           </div>
 

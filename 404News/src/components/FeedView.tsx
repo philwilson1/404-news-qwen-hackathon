@@ -5,7 +5,11 @@ import { categories } from '../data/fallback';
 import NewsCard from './NewsCard';
 import ArticleDetail from './ArticleDetail';
 
-export default function FeedView() {
+interface FeedViewProps {
+  category?: string;
+}
+
+export default function FeedView({ category = 'tech' }: FeedViewProps) {
   const [activeVibe, setActiveVibe] = useState<string>('all');
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,19 +18,43 @@ export default function FeedView() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
 
   const load = useCallback(async () => {
-    try { const [data, bookmarks] = await Promise.all([fetchArticles(), fetchBookmarks()]); setArticles(data); setBookmarkedIds(new Set(bookmarks.map((b) => b.article_id))); } catch {}
+    setLoading(true);
+    try { 
+      // Pass category to fetchArticles
+      const [data, bookmarks] = await Promise.all([fetchArticles(category), fetchBookmarks()]); 
+      setArticles(data || []); 
+      setBookmarkedIds(new Set(bookmarks.map((b) => b.article_id))); 
+    } catch {}
     setLoading(false);
-  }, []);
-  useEffect(() => { load(); }, [load]);
+  }, [category]); // <-- Reloads whenever the active category prop changes!
 
-  const handleRefresh = async () => { if (pipelineRunning || articles.length === 0) return; setPipelineRunning(true); try { await runPipeline(); await load(); } catch {} setTimeout(() => setPipelineRunning(false), 1500); };
+  useEffect(() => { 
+    load(); 
+  }, [load]);
+
+  const handleRefresh = async () => { 
+    if (pipelineRunning || articles.length === 0) return; 
+    setPipelineRunning(true); 
+    try { 
+      await runPipeline(); 
+      await load(); 
+    } catch {} 
+    setTimeout(() => setPipelineRunning(false), 1500); 
+  };
+
   const handleBookmark = async (article: Article, isBookmarked: boolean) => {
     await toggleBookmark(article, isBookmarked);
-    setBookmarkedIds((prev) => { const next = new Set(prev); if (isBookmarked) next.delete(article.id); else next.add(article.id); return next; });
+    setBookmarkedIds((prev) => { 
+      const next = new Set(prev); 
+      if (isBookmarked) next.delete(article.id); 
+      else next.add(article.id); 
+      return next; 
+    });
   };
 
   const filtered = activeVibe === 'all' ? articles : articles.filter((a) => a.vibe === activeVibe);
-  const featured = filtered[0]; const rest = filtered.slice(1);
+  const featured = filtered[0]; 
+  const rest = filtered.slice(1);
 
   if (loading) return (
     <div className="pt-2 pb-24">
@@ -40,8 +68,8 @@ export default function FeedView() {
     <div className="pt-2 pb-24 px-4">
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle size={32} className="text-zinc-600 mb-3" />
-        <p className="text-white font-semibold">Couldn't load the feed</p>
-        <p className="text-zinc-500 text-sm mt-1 mb-4">Our agents are scanning sources — check back soon.</p>
+        <p className="text-white font-semibold">Couldn't load the feed for {category}</p>
+        <p className="text-zinc-500 text-sm mt-1 mb-4">Our agents are scanning sources — check back soon or run the scraper.</p>
         <button onClick={load} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-sm font-semibold hover:bg-zinc-800 transition-colors">Retry</button>
       </div>
     </div>

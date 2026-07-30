@@ -17,6 +17,9 @@ function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  
+  // Category state (defaults to 'tech')
+  const [activeCategory, setActiveCategory] = useState<string>('tech');
 
   useEffect(() => {
     getCurrentUser().then((u) => {
@@ -36,6 +39,12 @@ function App() {
   }, []);
 
   const dismissToast = useCallback(() => setToast(null), []);
+
+  const handleSelectCategory = useCallback((category: string) => {
+    setActiveCategory(category);
+    setActiveTab('feed'); // Ensure user jumps back to the main feed tab when switching categories
+    setShowBookmarks(false);
+  }, []);
 
   if (authLoading) {
     return (
@@ -58,7 +67,7 @@ function App() {
             <BookmarksView onBack={() => setShowBookmarks(false)} />
           ) : (
             <>
-              {activeTab === 'feed' && <FeedView />}
+              {activeTab === 'feed' && <FeedView category={activeCategory} />}
               {activeTab === 'ai' && <AIView />}
               {activeTab === 'profile' && (
                 <ProfileView user={user} onOpenBookmarks={() => setShowBookmarks(true)} />
@@ -68,7 +77,13 @@ function App() {
         </main>
         <BottomNav active={activeTab} onChange={setActiveTab} />
       </div>
-      <SideDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onLockedCategory={showLockedToast} />
+      <SideDrawer 
+        open={drawerOpen} 
+        onClose={() => setDrawerOpen(false)} 
+        onLockedCategory={showLockedToast}
+        activeCategory={activeCategory}
+        onSelectCategory={handleSelectCategory}
+      />
       <Toast toast={toast} onDismiss={dismissToast} />
     </div>
   );
