@@ -100,9 +100,6 @@ def run_pipeline():
     if not _service_client:
         return jsonify({'error': 'Pipeline not configured on the server.'}), 500
 
-  if not _service_client:
-        return jsonify({'error': 'Pipeline not configured on the server.'}), 500
-
     try:
         raw_articles = fetch_articles(category="all", force=True)
         if not raw_articles:
