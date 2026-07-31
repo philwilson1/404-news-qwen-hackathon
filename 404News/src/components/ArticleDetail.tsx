@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, CheckCircle2, Eye, Clock, Send, Sparkles } from 'lucide-react';
+import { X, CheckCircle2, Eye, Clock, Send, Sparkles, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { supabase, saveChatMessage, type Article } from '../lib/supabase';
 
@@ -12,23 +12,96 @@ export default function ArticleDetail({ article, onClose }: {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Load chat history for this specific article from Supabase
   useEffect(() => {
-    if (article) {
-      setMessages([
-        {
-          id: 'system-init',
-          role: 'assistant',
-          content: `Hi! I am 404 AI. I have fully indexed this article. Ask me any specific questions about it!`
+    if (!article) return;
+
+    let isMounted = true;
+
+    async function loadArticleChatHistory() {
+      setLoadingHistory(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          if (isMounted) {
+            setMessages([
+              {
+                id: 'system-init',
+                role: 'assistant',
+                content: `Hi! I am 404 AI. I have fully indexed this article. Ask me any specific questions about it!`
+              }
+            ]);
+            setLoadingHistory(false);
+          }
+          return;
         }
-      ]);
+
+        const { data, error } = await supabase
+          .from('chat_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        // Filter messages tied to this article
+        const articleMessages = (data || []).filter((msg) => {
+          if (!msg.sources || !Array.isArray(msg.sources)) return false;
+          return msg.sources.some((src: any) => 
+            src?.id === article.id || 
+            src?.title === article.title || 
+            src === article.id
+          );
+        });
+
+        if (isMounted) {
+          if (articleMessages.length > 0) {
+            setMessages(
+              articleMessages.map((m, idx) => ({
+                id: m.id || `hist-${idx}`,
+                role: m.role as 'user' | 'assistant',
+                content: m.content || ''
+              }))
+            );
+          } else {
+            setMessages([
+              {
+                id: 'system-init',
+                role: 'assistant',
+                content: `Hi! I am 404 AI. I have fully indexed this article. Ask me any specific questions about it!`
+              }
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error('Error loading article chat history:', err);
+        if (isMounted) {
+          setMessages([
+            {
+              id: 'system-init',
+              role: 'assistant',
+              content: `Hi! I am 404 AI. I have fully indexed this article. Ask me any specific questions about it!`
+            }
+          ]);
+        }
+      } finally {
+        if (isMounted) setLoadingHistory(false);
+      }
     }
+
+    loadArticleChatHistory();
+
+    return () => {
+      isMounted = false;
+    };
   }, [article]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, loadingHistory]);
 
   if (!article) return null;
 
@@ -37,7 +110,6 @@ export default function ArticleDetail({ article, onClose }: {
     if (!query || sending) return;
 
     setInput('');
-    setSending(false);
 
     const userMsg: DisplayMessage = { id: `u-${Date.now()}`, role: 'user', content: query };
     const assistantId = `a-${Date.now()}`;
@@ -46,9 +118,22 @@ export default function ArticleDetail({ article, onClose }: {
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setSending(true);
 
+    // Save user message to Supabase chat history
+    try {
+      await saveChatMessage('user', query, [article]);
+    } catch (e) {
+      console.warn('Failed to persist user message:', e);
+    }
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+
+      // Include recent messages in the request for prompt continuity
+      const historyPayload = messages
+        .filter((m) => m.id !== 'system-init')
+        .concat(userMsg)
+        .map((m) => ({ role: m.role, content: m.content }));
 
       const res = await fetch('https://four04-news.onrender.com/chat', {
         method: 'POST',
@@ -57,7 +142,7 @@ export default function ArticleDetail({ article, onClose }: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          messages: [{ role: 'user', content: query }],
+          messages: historyPayload.length > 0 ? historyPayload : [{ role: 'user', content: query }],
           articles: [{ title: article.title, summary: article.summary, source: article.source }],
           stream: true,
         }),
@@ -171,23 +256,31 @@ export default function ArticleDetail({ article, onClose }: {
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-2">
               Context-Aware Discussion Panel
             </p>
-            <div className="flex-1 space-y-3 mb-4">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${msg.role === 'user' ? 'bg-sky-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
-                    {msg.role === 'assistant' && (
-                      <div className="flex items-center gap-1.5 mb-1 text-sky-400 font-semibold">
-                        <Sparkles size={10} /> <span>404 AI</span>
+
+            {loadingHistory ? (
+              <div className="flex items-center justify-center py-8 text-zinc-500 gap-2 text-xs">
+                <Loader2 size={14} className="animate-spin" />
+                <span>Restoring past discussion...</span>
+              </div>
+            ) : (
+              <div className="flex-1 space-y-3 mb-4">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${msg.role === 'user' ? 'bg-sky-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
+                      {msg.role === 'assistant' && (
+                        <div className="flex items-center gap-1.5 mb-1 text-sky-400 font-semibold">
+                          <Sparkles size={10} /> <span>404 AI</span>
+                        </div>
+                      )}
+                      <div className="leading-relaxed prose prose-invert prose-xs max-w-none">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
-                    )}
-                    <div className="leading-relaxed prose prose-invert prose-xs max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   </div>
-                </div>
-              ))}
-              <div ref={chatEndRef} />
-            </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,12 +292,12 @@ export default function ArticleDetail({ article, onClose }: {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               placeholder="Ask about this story..."
-              disabled={sending}
+              disabled={sending || loadingHistory}
               className="flex-1 bg-transparent text-white text-xs placeholder:text-zinc-600 outline-none px-2"
             />
             <button
               onClick={handleSend}
-              disabled={sending || !input.trim()}
+              disabled={sending || loadingHistory || !input.trim()}
               className="w-8 h-8 rounded-lg bg-sky-500 flex items-center justify-center text-white transition-transform disabled:opacity-40"
             >
               <Send size={12} />
