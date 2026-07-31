@@ -21,6 +21,7 @@ def to_article_row(raw: dict) -> dict:
         "author": raw.get("source", "Staff"),
         "vibe": "deep-dives",
         "tag": slugify_tag(raw.get("source", "general")),
+        "category": raw.get("category", "tech"),
         "verified": True,
         "confidence": 0.8,
         "image_url": "",
@@ -45,8 +46,6 @@ def get_existing_titles(client: Client) -> set:
 
 
 def main():
-    """CLI entry point — only runs when this file is executed directly,
-    e.g. `python insert_articles.py`. Not triggered by importing this module."""
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_service_key = os.getenv("SUPABASE_SERVICE_KEY")
 
@@ -58,9 +57,9 @@ def main():
 
     supabase: Client = create_client(supabase_url, supabase_service_key)
 
-    print("Fetching real articles from RSS sources...")
-    raw_articles = fetch_articles(force=True)
-    print(f"Fetched {len(raw_articles)} raw articles.")
+    print("Fetching real articles from all categories...")
+    raw_articles = fetch_articles(category="all", force=True)
+    print(f"Fetched {len(raw_articles)} raw articles across all categories.")
 
     if not raw_articles:
         print("No articles fetched — check your internet connection or RSS feed URLs in scraper.py.")
