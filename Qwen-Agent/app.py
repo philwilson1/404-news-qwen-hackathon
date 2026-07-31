@@ -90,7 +90,6 @@ def run_pipeline():
     if request.method == 'OPTIONS':
         return '', 200
 
-    # Allow EITHER a real logged-in user OR the automated pipeline secret
     user_id = get_verified_user_id()
     is_automated = is_valid_pipeline_secret()
 
@@ -100,34 +99,32 @@ def run_pipeline():
     if not _service_client:
         return jsonify({'error': 'Pipeline not configured on the server.'}), 500
 
-        try:
+    try:
         raw_articles = fetch_articles(category="all", force=True)
- 
-        # Diagnostic: count how many raw articles came back per category
+
         category_counts = {}
         for a in raw_articles:
             cat = a.get("category", "unknown")
             category_counts[cat] = category_counts.get(cat, 0) + 1
- 
+
         if not raw_articles:
             return jsonify({
                 'inserted': 0,
                 'message': 'No articles fetched from sources.',
                 'debug_category_counts': category_counts
             }), 200
- 
+
         existing_titles = get_existing_titles_from(_service_client)
         new_rows = [
             to_article_row(a) for a in raw_articles
             if a.get("title") and a["title"].strip() not in existing_titles
         ]
- 
-        # Diagnostic: count how many NEW rows (post-dedup) per category
+
         new_category_counts = {}
         for r in new_rows:
             cat = r.get("category", "unknown")
             new_category_counts[cat] = new_category_counts.get(cat, 0) + 1
- 
+
         if not new_rows:
             return jsonify({
                 'inserted': 0,
@@ -135,7 +132,7 @@ def run_pipeline():
                 'debug_raw_fetched': len(raw_articles),
                 'debug_category_counts': category_counts
             }), 200
- 
+
         result = _service_client.table("articles").insert(new_rows).execute()
         return jsonify({
             'inserted': len(result.data),
@@ -148,7 +145,6 @@ def run_pipeline():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/chat', methods=['POST', 'OPTIONS'])
 @limiter.limit("20 per hour")
