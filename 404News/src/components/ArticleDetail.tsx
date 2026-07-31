@@ -265,19 +265,31 @@ export default function ArticleDetail({ article, onClose }: {
             ) : (
               <div className="flex-1 space-y-3 mb-4">
                 {messages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${msg.role === 'user' ? 'bg-sky-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
-                      {msg.role === 'assistant' && (
-                        <div className="flex items-center gap-1.5 mb-1 text-sky-400 font-semibold">
-                          <Sparkles size={10} /> <span>404 AI</span>
-                        </div>
-                      )}
-                      <div className="leading-relaxed prose prose-invert prose-xs max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+    <div className={`max-w-[90%] rounded-xl px-3 py-2 text-xs ${msg.role === 'user' ? 'bg-sky-500 text-white' : 'bg-zinc-900 border border-zinc-800 text-zinc-200'}`}>
+      {msg.role === 'assistant' && (
+        <div className="flex items-center gap-1.5 mb-1 text-sky-400 font-semibold">
+          <Sparkles size={10} /> <span>404 AI</span>
+        </div>
+      )}
+      
+      {msg.role === 'assistant' && !msg.content ? (
+        <div className="flex items-center gap-2 text-zinc-400 text-xs py-1 italic">
+          <span className="flex gap-1 items-center">
+            <span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+            <span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+            <span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-bounce"></span>
+          </span>
+          <span className="text-[11px] text-zinc-500 font-mono">Analyzing article & drafting reply...</span>
+        </div>
+      ) : (
+        <div className="leading-relaxed prose prose-invert prose-xs max-w-none">
+          <ReactMarkdown>{msg.content}</ReactMarkdown>
+        </div>
+      )}
+    </div>
+  </div>
+))}
                 <div ref={chatEndRef} />
               </div>
             )}
