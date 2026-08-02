@@ -22,8 +22,6 @@ export type AuthUser = User;
 
 // ============================================
 // CLIENT SETUP — single instance, created once, used everywhere.
-// Creating more than one client against the same localStorage session
-// causes them to race on token refresh and fail intermittently.
 // ============================================
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -31,8 +29,6 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
 
 export const supabase: SupabaseClient = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-// db() now just returns the same single client, or null if not configured —
-// kept so existing calls to db() elsewhere in the file don't need to change.
 function db(): SupabaseClient | null {
   if (!supabaseUrl || !supabaseAnonKey) return null;
   return supabase;
@@ -95,31 +91,35 @@ export async function signOut(): Promise<void> {
 // DATA FUNCTIONS (USER SCOPED)
 // ============================================
 
-export async function fetchArticles(category?: string): Promise<Article[]> {
-  const c = db(); 
-  if (!c) return fallbackArticles;
-
+export async function fetchArticles(category: string = 'tech', ignoreCutoff: boolean = false) {
   try {
-    let query = c.from('articles').select('*').order('created_at', { ascending: false });
-    
-    // Filter by category if passed and not requesting 'all'
-    if (category && category !== 'all') {
-      query = query.ilike('category', category); // <--- Updated to .ilike()
+    let query = supabase.from('articles').select('*');
+
+    // Only apply the 14-day limit if NOT fetching Archive
+    if (!ignoreCutoff) {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 14);
+      query = query.gte('created_at', cutoffDate.toISOString());
+    }
+
+    query = query.order('created_at', { ascending: false }).limit(100);
+
+    if (category && category.toLowerCase() !== 'all') {
+      query = query.eq('category', category);
     }
 
     const { data, error } = await query;
-
     if (error) {
       console.error('Error fetching articles:', error);
       return fallbackArticles;
     }
 
-    // Return the actual data (even if empty array []) so empty categories don't default to fallback AI news
     return (data as Article[]) || [];
-  } catch { 
-    return fallbackArticles; 
+  } catch {
+    return fallbackArticles;
   }
 }
+
 export async function fetchBookmarks(): Promise<Bookmark[]> {
   const c = db(); if (!c) return [];
   try {
@@ -227,7 +227,6 @@ export async function runPipeline(): Promise<AgentRun[]> {
  
     const result = await res.json();
  
-    // Log a real status row reflecting what actually happened, for the UI's status feed
     await c.from('agent_runs').insert([
       {
         agent_name: 'pipeline',
@@ -334,7 +333,6 @@ export async function fetchBookmarkedArticles(): Promise<Article[]> {
     const user = await getCurrentUser();
     if (!user) return [];
 
-    // 1. Get all article_ids bookmarked by this user
     const { data: bookmarkRows, error: bmError } = await c
       .from('bookmarks')
       .select('article_id')
@@ -344,7 +342,6 @@ export async function fetchBookmarkedArticles(): Promise<Article[]> {
 
     const articleIds = bookmarkRows.map((b) => b.article_id);
 
-    // 2. Fetch full article details for those IDs from the articles table
     const { data: articles, error: artError } = await c
       .from('articles')
       .select('*')

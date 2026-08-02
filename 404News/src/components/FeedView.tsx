@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, AlertCircle, Calendar } from 'lucide-react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 import { fetchArticles, fetchBookmarks, toggleBookmark, runPipeline, type Article } from '../lib/supabase';
 import { categories } from '../data/fallback';
 import NewsCard from './NewsCard';
@@ -11,7 +11,7 @@ interface FeedViewProps {
 
 export default function FeedView({ category = 'tech' }: FeedViewProps) {
   const [activeVibe, setActiveVibe] = useState<string>('all');
-  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'yesterday'>('all'); // Added Time Filter state
+  const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'yesterday' | 'archive'>('all');
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [pipelineRunning, setPipelineRunning] = useState(false);
@@ -21,13 +21,17 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try { 
-      // Pass category to fetchArticles
-      const [data, bookmarks] = await Promise.all([fetchArticles(category), fetchBookmarks()]); 
+      // If timeFilter is 'archive', bypass the 14-day cutoff on fetch
+      const ignoreCutoff = timeFilter === 'archive';
+      const [data, bookmarks] = await Promise.all([
+        fetchArticles(category, ignoreCutoff), 
+        fetchBookmarks()
+      ]); 
       setArticles(data || []); 
       setBookmarkedIds(new Set(bookmarks.map((b) => b.article_id))); 
     } catch {}
     setLoading(false);
-  }, [category]); // <-- Reloads whenever the active category prop changes!
+  }, [category, timeFilter]);
 
   useEffect(() => { 
     load(); 
@@ -56,7 +60,7 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
   // 1. Filter by Vibe first
   const vibeFiltered = activeVibe === 'all' ? articles : articles.filter((a) => a.vibe === activeVibe);
 
-  // 2. Filter by Time (Today / Yesterday / All)
+  // 2. Filter by Time (Today / Yesterday / All / Archive)
   const filtered = vibeFiltered.filter((article) => {
     if (timeFilter === 'all') return true;
 
@@ -71,6 +75,14 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
 
     if (timeFilter === 'today') return isToday;
     if (timeFilter === 'yesterday') return isYesterday;
+    
+    // Archive: Display articles older than 14 days
+    if (timeFilter === 'archive') {
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(today.getDate() - 14);
+      return articleDate < fourteenDaysAgo;
+    }
+
     return true;
   });
 
@@ -107,7 +119,9 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
 
       <div className="px-4 mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-white font-bold text-lg leading-tight">Today's Pulse</h2>
+          <h2 className="text-white font-bold text-lg leading-tight">
+            {timeFilter === 'archive' ? 'Archived News' : "Today's Pulse"}
+          </h2>
           <p className="text-xs text-zinc-500">{filtered.length} verified stories</p>
         </div>
 
@@ -132,11 +146,16 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
             >
               Yesterday
             </button>
+            <button
+              onClick={() => setTimeFilter('archive')}
+              className={`px-2 py-0.5 rounded transition-colors ${timeFilter === 'archive' ? 'bg-amber-500 text-white font-semibold' : 'text-zinc-400 hover:text-white'}`}
+            >
+              Archive
+            </button>
           </div>
 
           <button onClick={handleRefresh} disabled={pipelineRunning} className="flex items-center gap-1 text-xs font-medium text-sky-400 disabled:text-zinc-600">
             <RefreshCw size={12} className={pipelineRunning ? 'animate-spin' : ''} />
-            {pipelineRunning ? '' : ''}
           </button>
         </div>
       </div>
