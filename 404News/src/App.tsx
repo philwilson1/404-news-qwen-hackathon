@@ -6,6 +6,7 @@ import FeedView from './components/FeedView';
 import AIView from './components/AIView';
 import ProfileView from './components/ProfileView';
 import BookmarksView from './components/BookmarksView';
+import SearchView from './components/SearchView'; // 1. Import SearchView
 import Toast, { type ToastState } from './components/Toast';
 import AuthView from './components/AuthView';
 import { getCurrentUser, onAuthChange, type AuthUser } from './lib/supabase';
@@ -17,6 +18,7 @@ function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showSearch, setShowSearch] = useState(false); // 2. Add showSearch state
   
   // Category state (defaults to 'tech')
   const [activeCategory, setActiveCategory] = useState<string>('tech');
@@ -44,6 +46,7 @@ function App() {
     setActiveCategory(category);
     setActiveTab('feed'); // Ensure user jumps back to the main feed tab when switching categories
     setShowBookmarks(false);
+    setShowSearch(false); // Close search view if a category is selected from the drawer
   }, []);
 
   if (authLoading) {
@@ -61,9 +64,20 @@ function App() {
   return (
     <div className="min-h-screen bg-black text-white">
       <div className="mx-auto max-w-md min-h-screen bg-zinc-950 relative shadow-2xl">
-        <Header onOpenDrawer={() => setDrawerOpen(true)} onSearchClick={() => {}} />
+        {/* 3. Connect onSearchClick to trigger showSearch */}
+        <Header 
+          onOpenDrawer={() => setDrawerOpen(true)} 
+          onSearchClick={() => {
+            setShowSearch(true);
+            setShowBookmarks(false);
+          }} 
+        />
+        
         <main>
-          {showBookmarks ? (
+          {/* 4. Prioritize rendering SearchView when active */}
+          {showSearch ? (
+            <SearchView onBack={() => setShowSearch(false)} />
+          ) : showBookmarks ? (
             <BookmarksView onBack={() => setShowBookmarks(false)} />
           ) : (
             <>
@@ -75,8 +89,17 @@ function App() {
             </>
           )}
         </main>
-        <BottomNav active={activeTab} onChange={setActiveTab} />
+
+        <BottomNav 
+          active={activeTab} 
+          onChange={(tab) => {
+            setActiveTab(tab);
+            setShowSearch(false); // Close search when switching bottom tabs
+            setShowBookmarks(false);
+          }} 
+        />
       </div>
+
       <SideDrawer 
         open={drawerOpen} 
         onClose={() => setDrawerOpen(false)} 
@@ -84,8 +107,10 @@ function App() {
         activeCategory={activeCategory}
         onSelectCategory={handleSelectCategory}
       />
+      
       <Toast toast={toast} onDismiss={dismissToast} />
     </div>
   );
 }
+
 export default App;

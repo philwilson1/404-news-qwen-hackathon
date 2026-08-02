@@ -17,9 +17,11 @@ FEEDS_BY_CATEGORY = {
         "https://www.politico.com/rss/politicopicks.xml",
     ],
     "startups": [
-        "https://techcrunch.com/category/startups/feed/",
-        "https://venturebeat.com/feed/",
-    ],
+    "https://techcrunch.com/category/startups/feed/",
+    "https://venturebeat.com/feed/",
+    "https://www.crunchbase.com/feed",
+    "https://sifted.eu/feed",
+],
 }
 
 _cache = {}  # keyed by category, each value: {"articles": [...], "last_fetch": ts}
