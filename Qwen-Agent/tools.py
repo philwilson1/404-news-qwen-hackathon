@@ -28,6 +28,16 @@ TOOL_SCHEMAS: List[dict] = [
         "description": "List the topics the user currently follows.",
         "parameters": {"type": "object", "properties": {}}}},
     {"type": "function", "function": {
+        "name": "get_category_news",
+        "description": "Current stories WITH short summaries from curated publisher feeds (TechCrunch, MIT Technology "
+                       "Review, Ars Technica, BBC, Al Jazeera, VentureBeat and others). Use for AI and technology "
+                       "(tech), startups and funding (startups), and world affairs (geopolitics). Best choice for "
+                       "'what is trending in AI/tech' style questions.",
+        "parameters": {"type": "object", "properties": {
+            "category": {"type": "string", "enum": ["tech", "startups", "geopolitics"]},
+            "limit": {"type": "integer", "description": "1-8, default 6"}},
+            "required": ["category"]}}},
+    {"type": "function", "function": {
         "name": "get_topic_news",
         "description": "Get current headlines on ANY topic right now (does not follow it). Use for 'what is new "
                        "on X', or whenever an answer depends on recent events.",
@@ -43,11 +53,25 @@ def _compact(articles: List[dict], n: int) -> List[dict]:
              "link": a.get("link", "")} for a in articles[:n]]
 
 
+def _round_robin(items: List[dict], n: int) -> List[dict]:
+    """Mix outlets so one publisher cannot fill the whole answer."""
+    groups: Dict[str, List[dict]] = {}
+    for a in items:
+        groups.setdefault(a.get("source", ""), []).append(a)
+    out: List[dict] = []
+    while len(out) < n and any(groups.values()):
+        for g in groups.values():
+            if g and len(out) < n:
+                out.append(g.pop(0))
+    return out
+
+
 class ToolRunner:
     def __init__(self, store: Store, llm: GroqClient, settings: Settings, user_id: str,
-                 fetch: Optional[Callable] = None):
+                 fetch: Optional[Callable] = None, fetch_category: Optional[Callable] = None):
         self.store, self.llm, self.s, self.user_id = store, llm, settings, user_id
         self.fetch = fetch or sources.fetch_topic_articles
+        self.fetch_category = fetch_category or (lambda cat: sources.fetch_articles(category=cat, limit_per_feed=4))
 
     def run(self, name: str, raw_args: str) -> Dict[str, Any]:
         """Returns {"result": dict_for_the_model, "event": dict_for_the_ui_or_None}."""
@@ -58,7 +82,8 @@ class ToolRunner:
         except ValueError:
             return {"result": {"ok": False, "error": "Arguments were not valid JSON."}, "event": None}
         handler = {"follow_topic": self._follow, "unfollow_topic": self._unfollow,
-                   "list_followed_topics": self._list, "get_topic_news": self._news}.get(name)
+                   "list_followed_topics": self._list, "get_topic_news": self._news,
+                   "get_category_news": self._category}.get(name)
         if not handler:
             return {"result": {"ok": False, "error": f"Unknown tool {name}."}, "event": None}
         try:
@@ -118,3 +143,14 @@ class ToolRunner:
         return {"result": {"ok": True, "topic": topic, "count": len(articles),
                            "headlines": _compact(articles, limit),
                            "note": "Headlines only. Do not claim details beyond them."}, "event": None}
+
+    def _category(self, args):
+        cat = str(args.get("category", "")).lower()
+        if cat not in sources.FEEDS_BY_CATEGORY:
+            return {"result": {"ok": False, "error": "category must be tech, startups or geopolitics."}, "event": None}
+        limit = max(1, min(int(args.get("limit") or 6), 8))
+        items = _round_robin(self.fetch_category(cat), limit)
+        stories = [{"title": a["title"][:140], "source": a.get("source", ""), "summary": a.get("summary", "")[:240],
+                    "published": a.get("published", ""), "link": a.get("link", "")} for a in items]
+        return {"result": {"ok": True, "category": cat, "count": len(stories), "stories": stories,
+                           "note": "Summaries come from the publishers' own feeds."}, "event": None}

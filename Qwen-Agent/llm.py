@@ -155,7 +155,7 @@ class GroqClient:
         content_parts: List[str] = []
         calls: Dict[int, Dict[str, Any]] = {}
         try:
-            for raw in resp.iter_lines(decode_unicode=True):
+            for raw in resp.iter_lines():  # bytes: the stream has no charset, so requests would guess Latin-1
                 if not raw:
                     continue
                 line = raw.decode("utf-8") if isinstance(raw, bytes) else raw

@@ -38,7 +38,7 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
   }, [load]);
 
   const handleRefresh = async () => { 
-    if (pipelineRunning || articles.length === 0) return; 
+    if (pipelineRunning) return; 
     setPipelineRunning(true); 
     try { 
       await runPipeline(); 
@@ -103,7 +103,13 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
         <AlertCircle size={32} className="text-zinc-600 mb-3" />
         <p className="text-white font-semibold">Couldn't load the feed for {category}</p>
         <p className="text-zinc-500 text-sm mt-1 mb-4">Our agents are scanning sources — check back soon or run the scraper.</p>
-        <button onClick={load} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-sm font-semibold hover:bg-zinc-800 transition-colors">Retry</button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleRefresh} disabled={pipelineRunning} className="px-4 py-2 rounded-xl bg-sky-500 text-white text-sm font-semibold hover:bg-sky-400 transition-colors disabled:opacity-60">
+            {pipelineRunning ? 'Fetching news...' : 'Fetch latest news'}
+          </button>
+          <button onClick={load} className="px-4 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-sm font-semibold hover:bg-zinc-800 transition-colors">Retry</button>
+        </div>
+        {pipelineRunning && <p className="text-zinc-500 text-xs mt-3">The server may take up to a minute to wake up.</p>}
       </div>
     </div>
   );

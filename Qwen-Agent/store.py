@@ -132,13 +132,12 @@ class SupabaseStore(Store):
         self.db.table("topic_subscriptions").update({"last_refreshed_at": _now()}).eq("slug", slug).execute()
 
     def existing_titles(self, titles, category):
-        found: Set[str] = set()
-        titles = list(titles)
-        for i in range(0, len(titles), 50):  # keep the request URL short
-            chunk = titles[i:i + 50]
-            res = self.db.table("articles").select("title").eq("category", category).in_("title", chunk).execute()
-            found.update(r["title"] for r in (res.data or []))
-        return found
+        # Titles can contain quotes and commas, which break PostgREST in.(...) filters.
+        # Fetch the newest titles for this category and compare locally instead.
+        wanted = set(titles)
+        res = self.db.table("articles").select("title").eq("category", category) \
+            .order("created_at", desc=True).limit(1000).execute()
+        return {r["title"] for r in (res.data or [])} & wanted
 
     def insert_articles(self, rows):
         if not rows:

@@ -125,7 +125,13 @@ export default function AIView() {
                     </div>
                   )}
                   <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        a: ({ node: _node, ...props }) => (
+                          <a {...props} target="_blank" rel="noopener noreferrer" className="text-sky-400 underline break-words" />
+                        ),
+                      }}
+                    >{msg.content}</ReactMarkdown>
                     {msg.streaming && pipelineActive === false && (
                       <span className="inline-block w-1.5 h-4 bg-sky-400 ml-0.5 animate-pulse align-middle" />
                     )}

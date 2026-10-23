@@ -40,7 +40,11 @@ class FakeResp:
         self.text = json.dumps(self._body)
         self.closed = False
     def json(self): return self._body
-    def iter_lines(self, decode_unicode=False): return iter(self._lines)
+    def iter_lines(self, decode_unicode=False):
+        # Real requests: a text/event-stream response with no charset is decoded as ISO-8859-1 when
+        # decode_unicode=True, which turns UTF-8 punctuation into mojibake. Mimic that.
+        raw = [l.encode("utf-8") for l in self._lines]
+        return iter([b.decode("latin-1") for b in raw] if decode_unicode else raw)
     def close(self): self.closed = True
 
 
@@ -67,7 +71,7 @@ def make_client(responses, **kw):
 
 
 def sse_lines(*chunks):
-    return [f"data: {json.dumps(c)}" for c in chunks] + ["data: [DONE]"]
+    return [f"data: {json.dumps(c, ensure_ascii=False)}" for c in chunks] + ["data: [DONE]"]
 
 
 class ScriptedLLM:
@@ -214,6 +218,12 @@ class LLMTests(unittest.TestCase):
         self.assertEqual(json.loads(done["tool_calls"][0]["function"]["arguments"]), {"topic": "AI chips"})
         self.assertEqual(c.session.calls[0]["tool_choice"], "auto")
 
+    def test_stream_keeps_non_ascii_text_intact(self):
+        text = "AI\u2011discovered bug \u2014 Nigeria\u2019s bill"
+        c, _ = make_client([FakeResp(200, lines=sse_lines({"choices": [{"delta": {"content": text}}]}))])
+        events = list(c.stream_chat([{"role": "user", "content": "x"}]))
+        self.assertEqual(events[0]["text"], text)
+
     def test_throttle_spaces_requests(self):
         sleeps, t = [], [0.0]
         s = Settings(groq_api_key="k", rpm=30)  # one request per 2 seconds
@@ -323,6 +333,16 @@ class AgentTests(unittest.TestCase):
         self.assertFalse(r.run("unfollow_topic", json.dumps({"topic": "space"}))["result"]["ok"])
         self.assertFalse(r.run("follow_topic", "{not json")["result"]["ok"])
         self.assertFalse(r.run("nope", "{}")["result"]["ok"])
+
+    def test_category_tool_returns_summaries_mixed_across_outlets(self):
+        items = [{"title": f"A{i}", "source": "TechCrunch", "summary": "s" * 500, "link": f"https://a/{i}"} for i in range(5)]
+        items += [{"title": "B0", "source": "Ars", "summary": "short", "link": "https://b/0"}]
+        r = ToolRunner(self.store, ScriptedLLM([]), self.s, "user1", fetch_category=lambda cat: list(items))
+        out = r.run("get_category_news", json.dumps({"category": "tech", "limit": 3}))["result"]
+        self.assertTrue(out["ok"])
+        self.assertEqual([x["source"] for x in out["stories"]][:2], ["TechCrunch", "Ars"])
+        self.assertLessEqual(len(out["stories"][0]["summary"]), 240)
+        self.assertFalse(r.run("get_category_news", json.dumps({"category": "sports"}))["result"]["ok"])
 
     def test_news_tool_does_not_follow(self):
         r = self.runner(ScriptedLLM([]))
