@@ -1,12 +1,7 @@
 flask
 flask-cors
-gunicorn
-qwen-agent
-openai
-dashscope
-supabase
-feedparser
-numpy
-python-dateutil
-soundfile
 flask-limiter
+gunicorn
+requests
+feedparser
+supabase

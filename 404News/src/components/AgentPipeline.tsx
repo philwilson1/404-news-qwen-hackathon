@@ -20,46 +20,46 @@ const STEPS: PipelineStep[] = [
   {
     id: 'collector',
     agentName: 'Collector Agent',
-    model: 'qwen-coder',
+    model: 'google-news-rss',
     icon: FileSearch,
     color: 'text-sky-400',
     bgColor: 'bg-sky-500/10',
     borderColor: 'border-sky-500/30',
     glowColor: 'shadow-sky-500/20',
     logs: [
-      'Initializing qwen-coder for source ingestion...',
-      'Running chunk-and-discard on source data...',
-      'Raw noise stripped. Context window optimized.',
-      'JSON streams parsed from arXiv, GitHub, company blogs.',
+      'Querying Google News and publisher RSS feeds...',
+      'Removing duplicate headlines.',
+      'Capping each outlet so one source cannot dominate.',
+      'Headlines collected and normalised.',
     ],
   },
   {
     id: 'verification',
     agentName: 'Verification Agent',
-    model: 'qwen3-max-thinking',
+    model: 'gpt-oss-120b',
     icon: ShieldCheck,
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
     borderColor: 'border-emerald-500/30',
     glowColor: 'shadow-emerald-500/20',
     logs: [
-      'Loading qwen3-max-thinking with enable_thinking=true...',
-      'preserve_thinking=true — reasoning chain retained.',
-      'Cross-referencing GitHub commits and company blog...',
-      '2+ independent sources matched. Factual credibility verified at 98%.',
+      'Loading gpt-oss-120b on Groq...',
+      'Checking whether the question needs live news or a topic action.',
+      'Calling tools: get_topic_news / follow_topic when needed.',
+      'Tool results received. Headlines are not independently verified.',
     ],
   },
   {
     id: 'presenter',
     agentName: 'Presenter Agent',
-    model: 'qwen3.7-max',
+    model: 'gpt-oss-120b',
     icon: PenTool,
     color: 'text-amber-400',
     bgColor: 'bg-amber-500/10',
     borderColor: 'border-amber-500/30',
     glowColor: 'shadow-amber-500/20',
     logs: [
-      'Routing to qwen3.7-max for response synthesis...',
+      'Writing the answer from the retrieved headlines...',
       'Rendering clean Markdown & embedding verified resources.',
       'Response compiled. Streaming to user...',
     ],
@@ -196,10 +196,10 @@ export default function AgentPipeline({ active, onComplete }: AgentPipelineProps
                 const isLast = i === visibleLogs.length - 1;
                 const step = STEPS.find((s) => log.startsWith(`[${s.agentName}]`));
                 const agentColor = step?.color ?? 'text-zinc-400';
-                const agentIcon = step?.icon;
+                const AgentIcon = step?.icon;
                 return (
                   <div key={i} className="flex items-start gap-2 animate-fadeIn">
-                    {agentIcon ? <agentIcon size={11} className={`${agentColor} mt-0.5 flex-shrink-0`} /> : <span className="w-3 flex-shrink-0" />}
+                    {AgentIcon ? <AgentIcon size={11} className={`${agentColor} mt-0.5 flex-shrink-0`} /> : <span className="w-3 flex-shrink-0" />}
                     <p className={`text-[11px] font-mono leading-relaxed ${isLast ? 'text-zinc-300' : 'text-zinc-500'}`}>
                       <span className={agentColor}>{log.replace(/^\[.*?\]\s*/, '')}</span>
                       {isLast && !allDone && <span className="inline-block w-1.5 h-3 bg-sky-400 ml-0.5 animate-pulse align-middle" />}

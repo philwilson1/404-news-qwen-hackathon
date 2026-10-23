@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, CheckCircle2, Eye, Clock, Send, Sparkles, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { supabase, saveChatMessage, type Article } from '../lib/supabase';
+import { supabase, saveChatMessage, API_URL, type Article } from '../lib/supabase';
 
 interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; }
 
@@ -51,9 +51,9 @@ export default function ArticleDetail({ article, onClose }: {
         const articleMessages = (data || []).filter((msg) => {
           if (!msg.sources || !Array.isArray(msg.sources)) return false;
           return msg.sources.some((src: any) => 
-            src?.id === article.id || 
-            src?.title === article.title || 
-            src === article.id
+            src?.id === article?.id || 
+            src?.title === article?.title || 
+            src === article?.id
           );
         });
 
@@ -135,7 +135,7 @@ export default function ArticleDetail({ article, onClose }: {
         .concat(userMsg)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const res = await fetch('https://four04-news.onrender.com/chat', {
+      const res = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

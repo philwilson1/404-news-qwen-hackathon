@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, Send, TrendingUp, FileText, Zap, ShieldCheck, Trash2, Cpu } from 'lucide-react';
+import { Sparkles, Send, BellRing, Newspaper, ListChecks, TrendingUp, Trash2, Cpu, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { fetchArticles, fetchChatHistory, saveChatMessage, clearChatHistory, streamQwenChat, type Article, type ChatMessage } from '../lib/supabase';
+import { fetchArticles, fetchChatHistory, saveChatMessage, clearChatHistory, streamChat, type Article, type ChatMessage, type ChatEvent } from '../lib/supabase';
 import AgentPipeline from './AgentPipeline';
 
-interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; sources?: Article[]; streaming?: boolean; }
+interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; sources?: Article[]; streaming?: boolean; actions?: string[]; }
 const suggestions = [
-  { icon: TrendingUp, text: "What's trending in AI right now?", color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
-  { icon: FileText, text: 'Summarize the GPT-5 paper in 3 points', color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
-  { icon: Zap, text: 'Explain Magistral vs o3 in simple terms', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
-  { icon: ShieldCheck, text: 'Is the AlphaFold 3 hype real?', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  { icon: BellRing, text: 'Keep me in the loop on cybersecurity', color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
+  { icon: Newspaper, text: "What's new in Nigerian fintech?", color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+  { icon: TrendingUp, text: 'Follow quantum computing for me', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+  { icon: ListChecks, text: 'What topics am I following?', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
 ];
 
 export default function AIView() {
@@ -30,18 +30,25 @@ export default function AIView() {
   useEffect(() => { loadContext(); }, [loadContext]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' }); }, [messages, pipelineActive]);
 
-  const startStreaming = useCallback((query: string, assistantId: string, topArticles: Article[]) => {
-    streamQwenChat([{ role: 'user', content: query }], topArticles,
-      (token) => setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, content: m.content + token } : m)),
+  const startStreaming = useCallback((history: { role: 'user' | 'assistant'; content: string }[], assistantId: string, topArticles: Article[]) => {
+    const patch = (fn: (m: DisplayMessage) => DisplayMessage) =>
+      setMessages((prev) => prev.map((m) => m.id === assistantId ? fn(m) : m));
+    streamChat(history, topArticles,
+      (token: string) => patch((m) => ({ ...m, content: m.content + token })),
       async () => {
-        setMessages((prev) => prev.map((m) => m.id === assistantId ? { ...m, streaming: false } : m));
+        patch((m) => ({ ...m, streaming: false }));
         const finalContent = await new Promise<string>((resolve) => {
           setMessages((prev) => { const msg = prev.find((m) => m.id === assistantId); resolve(msg?.content ?? ''); return prev; });
         });
-        await saveChatMessage('assistant', finalContent, topArticles);
+        if (finalContent) await saveChatMessage('assistant', finalContent, topArticles);
         setSending(false);
       },
-      () => { setSending(false); }
+      (err: string) => { patch((m) => ({ ...m, streaming: false, content: m.content ? `${m.content}\n\n${err}` : err })); setSending(false); },
+      (ev: ChatEvent) => {
+        if (ev.status !== 'done' || !ev.changed || !ev.topic) return;
+        const label = ev.name === 'unfollow_topic' ? `Unfollowed ${ev.topic}` : `Following ${ev.topic}`;
+        patch((m) => ({ ...m, actions: [...(m.actions ?? []), label] }));
+      }
     );
   }, []);
 
@@ -59,8 +66,12 @@ export default function AIView() {
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     await saveChatMessage('user', query);
     const topArticles = articles.slice(0, 5);
+    const history = [
+      ...messages.filter((m) => m.content && !m.streaming).slice(-6).map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user' as const, content: query },
+    ];
 
-    pendingStreamRef.current = () => startStreaming(query, assistantId, topArticles);
+    pendingStreamRef.current = () => startStreaming(history, assistantId, topArticles);
     setPipelineKey((k) => k + 1);
     setPipelineActive(true);
   };
@@ -78,10 +89,10 @@ export default function AIView() {
           </div>
           <h2 className="text-white font-bold text-xl">404 AI</h2>
           <div className="flex items-center justify-center gap-2 mt-1">
-            <p className="text-zinc-500 text-sm">Ask me anything about today's AI news</p>
+            <p className="text-zinc-500 text-sm">Ask about the news, or tell me what to keep you posted on</p>
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20">
               <Cpu size={9} className="text-sky-400" />
-              <span className="text-[9px] font-bold text-sky-400">QWEN</span>
+              <span className="text-[9px] font-bold text-sky-400">GROQ</span>
             </span>
           </div>
         </div>
@@ -119,6 +130,15 @@ export default function AIView() {
                       <span className="inline-block w-1.5 h-4 bg-sky-400 ml-0.5 animate-pulse align-middle" />
                     )}
                   </div>
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {msg.actions.map((a, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
+                          <Check size={11} />{a}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {msg.sources && msg.sources.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-zinc-800">
                       <p className="text-[10px] font-semibold text-zinc-500 uppercase mb-1">Sources</p>
@@ -148,7 +168,7 @@ export default function AIView() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Ask about any AI story..."
+            placeholder="Ask, or say &quot;keep me posted on...&quot;"
             disabled={sending}
             className="flex-1 bg-transparent text-white text-sm placeholder:text-zinc-600 outline-none px-2 disabled:opacity-50"
           />

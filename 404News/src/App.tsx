@@ -4,6 +4,7 @@ import BottomNav, { type Tab } from './components/BottomNav';
 import SideDrawer from './components/SideDrawer';
 import FeedView from './components/FeedView';
 import AIView from './components/AIView';
+import TopicsView from './components/TopicsView';
 import ProfileView from './components/ProfileView';
 import BookmarksView from './components/BookmarksView';
 import SearchView from './components/SearchView'; // 1. Import SearchView
@@ -82,6 +83,7 @@ function App() {
           ) : (
             <>
               {activeTab === 'feed' && <FeedView category={activeCategory} />}
+              {activeTab === 'following' && <TopicsView />}
               {activeTab === 'ai' && <AIView />}
               {activeTab === 'profile' && (
                 <ProfileView user={user} onOpenBookmarks={() => setShowBookmarks(true)} />

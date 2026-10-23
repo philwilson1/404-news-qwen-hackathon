@@ -10,9 +10,21 @@ jobs:
   run-pipeline:
     runs-on: ubuntu-latest
     steps:
-      - name: Call the run-pipeline endpoint
+      # Render's free instance sleeps, so the first request can take ~50s to wake it.
+      # The long timeout + retries cover that.
+      - name: Refresh the category feeds (tech / geopolitics / startups)
         run: |
           curl -X POST "https://four04-news.onrender.com/run-pipeline" \
             -H "X-Pipeline-Secret: ${{ secrets.PIPELINE_SECRET }}" \
             -H "Content-Type: application/json" \
+            --max-time 150 --retry 3 --retry-delay 20 --retry-all-errors \
+            --fail-with-body
+
+      - name: Refresh every followed topic (new stories + briefings)
+        if: always()   # run even if the step above failed
+        run: |
+          curl -X POST "https://four04-news.onrender.com/run-digests" \
+            -H "X-Pipeline-Secret: ${{ secrets.PIPELINE_SECRET }}" \
+            -H "Content-Type: application/json" \
+            --max-time 150 --retry 3 --retry-delay 20 --retry-all-errors \
             --fail-with-body
