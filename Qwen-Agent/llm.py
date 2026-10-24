@@ -144,7 +144,7 @@ class GroqClient:
                 "model": resp.groq_model}
 
     def stream_chat(self, messages: List[dict], *, tools: Optional[list] = None, model: Optional[str] = None,
-                    max_tokens: int = 900, temperature: float = 0.4) -> Iterator[Dict[str, Any]]:
+                    max_tokens: int = 2500, temperature: float = 0.4) -> Iterator[Dict[str, Any]]:
         """Yields {"type": "text", "text": str} as tokens arrive, then one
         {"type": "done", "content": str, "tool_calls": [...], "model": str}."""
         payload: Dict[str, Any] = {"messages": messages, "max_tokens": max_tokens, "temperature": temperature}

@@ -4,6 +4,7 @@ import json
 from typing import Any, Callable, Dict, List, Optional
 
 import digest
+import reader
 import sources
 from config import Settings
 from llm import GroqClient
@@ -45,12 +46,27 @@ TOOL_SCHEMAS: List[dict] = [
             "topic": {"type": "string"},
             "limit": {"type": "integer", "description": "1-8, default 6"}},
             "required": ["topic"]}}},
+    {"type": "function", "function": {
+        "name": "read_article",
+        "description": "Open one news article from its link and read its text, so you can give real detail on a "
+                       "single story. Use when the user asks for more detail, 'tell me more', a deeper explanation "
+                       "or a summary of a specific story. Pass the link returned by a news tool or shown in your "
+                       "earlier answer. Never invent a link.",
+        "parameters": {"type": "object", "properties": {
+            "url": {"type": "string", "description": "The article link (http or https)"}},
+            "required": ["url"]}}},
 ]
 
 
 def _compact(articles: List[dict], n: int) -> List[dict]:
-    return [{"title": a["title"][:140], "source": a.get("source", ""), "published": a.get("published", ""),
-             "link": a.get("link", "")} for a in articles[:n]]
+    out = []
+    for a in articles[:n]:
+        item = {"title": a["title"][:140], "source": a.get("source", ""), "published": a.get("published", ""),
+                "link": a.get("link", "")}
+        if a.get("summary"):
+            item["summary"] = str(a["summary"])[:300]
+        out.append(item)
+    return out
 
 
 def _round_robin(items: List[dict], n: int) -> List[dict]:
@@ -68,9 +84,11 @@ def _round_robin(items: List[dict], n: int) -> List[dict]:
 
 class ToolRunner:
     def __init__(self, store: Store, llm: GroqClient, settings: Settings, user_id: str,
-                 fetch: Optional[Callable] = None, fetch_category: Optional[Callable] = None):
+                 fetch: Optional[Callable] = None, fetch_category: Optional[Callable] = None,
+                 read: Optional[Callable] = None):
         self.store, self.llm, self.s, self.user_id = store, llm, settings, user_id
         self.fetch = fetch or sources.fetch_topic_articles
+        self.read = read or reader.fetch_article_text
         self.fetch_category = fetch_category or (lambda cat: sources.fetch_articles(category=cat, limit_per_feed=4))
 
     def run(self, name: str, raw_args: str) -> Dict[str, Any]:
@@ -83,7 +101,7 @@ class ToolRunner:
             return {"result": {"ok": False, "error": "Arguments were not valid JSON."}, "event": None}
         handler = {"follow_topic": self._follow, "unfollow_topic": self._unfollow,
                    "list_followed_topics": self._list, "get_topic_news": self._news,
-                   "get_category_news": self._category}.get(name)
+                   "get_category_news": self._category, "read_article": self._read}.get(name)
         if not handler:
             return {"result": {"ok": False, "error": f"Unknown tool {name}."}, "event": None}
         try:
@@ -142,7 +160,7 @@ class ToolRunner:
                               region=self.s.news_region, max_age_days=self.s.topic_max_age_days)
         return {"result": {"ok": True, "topic": topic, "count": len(articles),
                            "headlines": _compact(articles, limit),
-                           "note": "Headlines only. Do not claim details beyond them."}, "event": None}
+                           "note": "Headlines (with a short summary when the feed provides one). Do not claim details beyond them."}, "event": None}
 
     def _category(self, args):
         cat = str(args.get("category", "")).lower()
@@ -150,7 +168,21 @@ class ToolRunner:
             return {"result": {"ok": False, "error": "category must be tech, startups or geopolitics."}, "event": None}
         limit = max(1, min(int(args.get("limit") or 6), 8))
         items = _round_robin(self.fetch_category(cat), limit)
-        stories = [{"title": a["title"][:140], "source": a.get("source", ""), "summary": a.get("summary", "")[:240],
+        stories = [{"title": a["title"][:140], "source": a.get("source", ""), "summary": a.get("summary", "")[:400],
                     "published": a.get("published", ""), "link": a.get("link", "")} for a in items]
         return {"result": {"ok": True, "category": cat, "count": len(stories), "stories": stories,
                            "note": "Summaries come from the publishers' own feeds."}, "event": None}
+
+    def _read(self, args):
+        url = str(args.get("url", "")).strip()
+        if not url:
+            return {"result": {"ok": False, "error": "Need an article link."}, "event": None}
+        try:
+            page = self.read(url)
+        except reader.ReaderError as e:
+            return {"result": {"ok": False, "error": str(e) + " Do not guess the article's details; tell the "
+                               "user and point them to the link."}, "event": None}
+        return {"result": {"ok": True, "title": page.get("title", ""), "outlet": page.get("host", ""),
+                           "text": page["text"],
+                           "note": "Excerpt of the article text. Only state what this text supports."},
+                "event": None}
