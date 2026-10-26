@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Sparkles, Send, BellRing, Newspaper, ListChecks, TrendingUp, Trash2, Cpu, Check } from 'lucide-react';
+import { Sparkles, Send, BellRing, Newspaper, ListChecks, TrendingUp, Trash2, Cpu, Check, ShieldCheck } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { fetchArticles, fetchChatHistory, saveChatMessage, clearChatHistory, streamChat, type Article, type ChatMessage, type ChatEvent } from '../lib/supabase';
 import AgentPipeline from './AgentPipeline';
@@ -9,6 +9,7 @@ const suggestions = [
   { icon: BellRing, text: 'Keep me in the loop on cybersecurity', color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
   { icon: Newspaper, text: "What's new in Nigerian fintech?", color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
   { icon: TrendingUp, text: 'Follow quantum computing for me', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+  { icon: ShieldCheck, text: 'Is this real? ', label: 'Check a WhatsApp forward or rumour', prefill: true, color: 'text-violet-400 bg-violet-500/10 border-violet-500/20' },
   { icon: ListChecks, text: 'What topics am I following?', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
 ];
 
@@ -105,8 +106,8 @@ export default function AIView() {
             {suggestions.map((s, i) => {
               const Icon = s.icon;
               return (
-                <button key={i} onClick={() => handleSend(s.text)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left text-sm font-medium text-zinc-300 transition-all hover:scale-[1.01] ${s.color}`}>
-                  <Icon size={16} />{s.text}
+                <button key={i} onClick={() => (s.prefill ? setInput(s.text) : handleSend(s.text))} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left text-sm font-medium text-zinc-300 transition-all hover:scale-[1.01] ${s.color}`}>
+                  <Icon size={16} />{s.label ?? s.text}
                 </button>
               );
             })}

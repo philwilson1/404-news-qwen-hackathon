@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, List, Optional
 import digest
 import reader
 import sources
+import verify
 from config import Settings
 from llm import GroqClient
 from store import Store, TopicLimitError
@@ -56,6 +57,17 @@ TOOL_SCHEMAS: List[dict] = [
         "parameters": {"type": "object", "properties": {
             "url": {"type": "string", "description": "The article link (http or https)"}},
             "required": ["url"]}}},
+    {"type": "function", "function": {
+        "name": "check_claim",
+        "description": "Check whether a claim, rumour, viral message or WhatsApp forward is backed up. Searches for "
+                       "independent outlets covering it and for fact-checks from Nigerian and African fact-checkers. "
+                       "Use whenever the user pastes a message or asks 'is this true / real / fake'. Returns evidence "
+                       "only, not a verdict.",
+        "parameters": {"type": "object", "properties": {
+            "claim": {"type": "string", "description": "The claim or message, as the user wrote it"},
+            "query": {"type": "string", "description": "3 to 8 search keywords: the names, places, numbers and "
+                                                        "event in the claim"}},
+            "required": ["claim"]}}},
 ]
 
 
@@ -86,10 +98,11 @@ def _round_robin(items: List[dict], n: int) -> List[dict]:
 class ToolRunner:
     def __init__(self, store: Store, llm: GroqClient, settings: Settings, user_id: str,
                  fetch: Optional[Callable] = None, fetch_category: Optional[Callable] = None,
-                 read: Optional[Callable] = None):
+                 read: Optional[Callable] = None, check: Optional[Callable] = None):
         self.store, self.llm, self.s, self.user_id = store, llm, settings, user_id
         self.fetch = fetch or sources.fetch_topic_articles
         self.read = read or reader.fetch_article_text
+        self.check = check or verify.check_claim
         self.fetch_category = fetch_category or (lambda cat: sources.fetch_articles(category=cat, limit_per_feed=4))
 
     def run(self, name: str, raw_args: str) -> Dict[str, Any]:
@@ -102,7 +115,7 @@ class ToolRunner:
             return {"result": {"ok": False, "error": "Arguments were not valid JSON."}, "event": None}
         handler = {"follow_topic": self._follow, "unfollow_topic": self._unfollow,
                    "list_followed_topics": self._list, "get_topic_news": self._news,
-                   "get_category_news": self._category, "read_article": self._read}.get(name)
+                   "get_category_news": self._category, "read_article": self._read, "check_claim": self._check}.get(name)
         if not handler:
             return {"result": {"ok": False, "error": f"Unknown tool {name}."}, "event": None}
         try:
@@ -187,3 +200,12 @@ class ToolRunner:
                            "text": page["text"],
                            "note": "Excerpt of the article text. Only state what this text supports."},
                 "event": None}
+
+    def _check(self, args):
+        claim = str(args.get("claim", "")).strip()
+        try:
+            res = self.check(claim, str(args.get("query", "")).strip() or None)
+        except Exception as e:
+            print(f"[tools] check_claim failed: {e}")
+            res = {"ok": False, "error": "The claim check could not run right now. Say so and do not guess."}
+        return {"result": res, "event": None}

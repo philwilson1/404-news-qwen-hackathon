@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Bookmark, CheckCircle2, TrendingUp, Eye, Clock, ChevronDown } from 'lucide-react';
 import type { Article } from '../lib/supabase';
+import CorroborationBadge from './CorroborationBadge';
 
 const vibeColors: Record<string, string> = {
   'deep-dives': 'text-sky-400 bg-sky-500/10 border-sky-500/20',
@@ -54,7 +55,7 @@ export default function NewsCard({ article, featured = false, isBookmarked = fal
       )}
       <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-          {article.verified && (<span className="inline-flex items-center gap-1 text-emerald-400"><CheckCircle2 size={12} /><span className="font-semibold">Verified · {(article.confidence * 100).toFixed(0)}%</span></span>)}
+          <CorroborationBadge article={article} />
           <span className="inline-flex items-center gap-1"><Eye size={12} /> {article.views}</span>
           <span className="inline-flex items-center gap-1"><Clock size={12} /> {article.read_time} min</span>
         </div>

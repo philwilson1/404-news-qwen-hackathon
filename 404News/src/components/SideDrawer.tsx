@@ -61,7 +61,7 @@ export default function SideDrawer({
 
           <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">Multi-Agent System</p>
           <div className="space-y-2">
-            {[{ icon: FileText, name: 'Collector', desc: 'Scrapes whitelisted AI sources' }, { icon: ShieldCheck, name: 'Verification', desc: 'Cross-checks 2+ independent sources' }, { icon: PenTool, name: 'Presenter', desc: 'Writes editorial hooks per vibe' }].map((agent) => { const Icon = agent.icon; return (
+            {[{ icon: FileText, name: 'Collector', desc: 'Scrapes whitelisted AI sources' }, { icon: ShieldCheck, name: 'Verification', desc: 'Counts independent outlets per story' }, { icon: PenTool, name: 'Presenter', desc: 'Writes editorial hooks per vibe' }].map((agent) => { const Icon = agent.icon; return (
               <div key={agent.name} className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-900/50 border border-zinc-800"><div className="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center flex-shrink-0"><Icon size={16} className="text-sky-400" /></div><div><p className="text-white text-sm font-semibold">{agent.name}</p><p className="text-zinc-600 text-xs">{agent.desc}</p></div></div> ); })}
           </div>
 
@@ -94,7 +94,7 @@ export default function SideDrawer({
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-zinc-900"><p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">About</p><p className="text-zinc-500 text-xs leading-relaxed">404News uses a 3-agent pipeline to collect, verify, and present AI news. Every story is checked against 2+ independent sources before publishing.</p></div>
+          <div className="mt-6 pt-4 border-t border-zinc-900"><p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-3">About</p><p className="text-zinc-500 text-xs leading-relaxed">404News collects stories from many outlets and counts how many independent ones report each story. Single-source stories are labelled, not hidden. Paste a rumour into 404 AI to check it.</p></div>
           <div className="mt-6"><a href="#" className="flex items-center gap-2 text-zinc-500 hover:text-white text-sm transition-colors"><Github size={16} />View source</a></div>
         </div>
       </div>

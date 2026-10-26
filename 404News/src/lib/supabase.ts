@@ -12,7 +12,18 @@ export interface Article {
   read_time: number; agent_log: AgentLogEntry[] | null; created_at: string;
   category?: 'tech' | 'geopolitics' | 'startups' | string;
 }
-export interface AgentLogEntry { agent: string; status: string; detail: string; link?: string; }
+export interface AgentLogEntry { agent: string; status: string; detail: string; link?: string; result?: string; count?: number; outlets?: string[]; }
+
+// How many independent outlets report a story, as counted by the backend's verification step.
+export type CorroborationStatus = 'corroborated' | 'single_source' | 'unchecked';
+export interface Corroboration { status: CorroborationStatus; count: number; outlets: string[]; }
+export function getCorroboration(article: { agent_log: AgentLogEntry[] | null }): Corroboration | null {
+  const entry = article.agent_log?.find((l) => l.agent === 'verification' && typeof l.count === 'number');
+  if (!entry) return null; // older stories were never cross-checked, so they get no badge at all
+  const status: CorroborationStatus =
+    entry.result === 'corroborated' || entry.result === 'single_source' ? entry.result : 'unchecked';
+  return { status, count: entry.count ?? 0, outlets: entry.outlets ?? [] };
+}
 export interface Bookmark { id: string; article_id: string; title: string; user_id?: string; created_at: string; }
 export interface ChatMessage { id: string; role: 'user' | 'assistant'; content: string; sources: Article[] | null; user_id?: string; created_at: string; }
 export interface Topic { id: string; user_id: string; topic: string; slug: string; query: string; created_at: string; last_refreshed_at: string | null; }

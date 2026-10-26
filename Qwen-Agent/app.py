@@ -16,6 +16,7 @@ import digest
 import sources
 from config import Settings, load_settings
 from llm import GroqClient, LLMError
+import verify
 from rows import to_article_row
 from store import Store, SupabaseStore
 
@@ -142,12 +143,13 @@ def create_app(settings: Settings = None, store: Store = None, llm: GroqClient =
             raw = sources.fetch_articles(category="all", force=True)
             if not raw:
                 return jsonify({"inserted": 0, "message": "No articles fetched from sources."}), 200
-            new_rows = []
+            fresh = []
             for cat in {a["category"] for a in raw}:
                 batch = [a for a in raw if a["category"] == cat and a.get("title")]
                 seen = store.existing_titles([a["title"].strip() for a in batch], cat)
-                new_rows += [to_article_row(a) for a in batch if a["title"].strip() not in seen]
-            inserted = store.insert_articles(new_rows)
+                fresh += [a for a in batch if a["title"].strip() not in seen]
+            verify.annotate(fresh, pool=raw)  # counts independent outlets per story (bounded by a time budget)
+            inserted = store.insert_articles([to_article_row(a) for a in fresh])
             msg = f"Inserted {inserted} new articles." if inserted else "No new articles. Everything already exists."
             return jsonify({"inserted": inserted, "message": msg}), 200
         except Exception as e:

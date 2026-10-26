@@ -128,7 +128,7 @@ export default function FeedView({ category = 'tech' }: FeedViewProps) {
           <h2 className="text-white font-bold text-lg leading-tight">
             {timeFilter === 'archive' ? 'Archived News' : "Today's Pulse"}
           </h2>
-          <p className="text-xs text-zinc-500">{filtered.length} verified stories</p>
+          <p className="text-xs text-zinc-500">{filtered.length} stories</p>
         </div>
 
         {/* Top-Right Area: Time Filter Toggle & Run Pipeline */}

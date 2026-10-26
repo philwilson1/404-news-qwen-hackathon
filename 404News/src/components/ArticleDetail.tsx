@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, CheckCircle2, Eye, Clock, Send, Sparkles, Loader2 } from 'lucide-react';
+import { X, Eye, Clock, Send, Sparkles, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import CorroborationBadge, { CorroborationDetail } from './CorroborationBadge';
 import { supabase, saveChatMessage, API_URL, type Article } from '../lib/supabase';
 
 interface DisplayMessage { id: string; role: 'user' | 'assistant'; content: string; }
@@ -237,15 +238,11 @@ export default function ArticleDetail({ article, onClose }: {
           <div>
             <h2 className="text-white font-bold text-xl leading-tight mb-2">{article.title}</h2>
             <div className="flex items-center gap-3 text-[11px] text-zinc-500 mb-3">
-              {article.verified && (
-                <span className="inline-flex items-center gap-1 text-emerald-400">
-                  <CheckCircle2 size={12} />
-                  <span className="font-semibold">Verified · {(article.confidence * 100).toFixed(0)}%</span>
-                </span>
-              )}
+              <CorroborationBadge article={article} />
               <span className="inline-flex items-center gap-1"><Eye size={12} /> {article.views}</span>
               <span className="inline-flex items-center gap-1"><Clock size={12} /> {article.read_time} min read</span>
             </div>
+            <CorroborationDetail article={article} />
             <div className="text-zinc-300 text-sm leading-relaxed bg-zinc-900/40 p-3 rounded-xl border border-zinc-900 prose prose-invert prose-sm max-w-none">
               <ReactMarkdown>{article.summary}</ReactMarkdown>
             </div>

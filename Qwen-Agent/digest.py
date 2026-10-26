@@ -3,6 +3,7 @@ import time
 from typing import Callable, Dict, List, Optional
 
 import sources
+import verify
 from config import Settings
 from llm import GroqClient, LLMError
 from rows import to_topic_row
@@ -54,6 +55,8 @@ def refresh_topic(store: Store, llm: GroqClient, settings: Settings, topic: dict
     category = f"topic-{slug}"
     seen = store.existing_titles([a["title"] for a in articles], category) if articles else set()
     fresh = [a for a in articles if a["title"] not in seen]
+    if fresh:
+        verify.annotate(fresh, pool=articles, online=False)  # local only: the batch already spans many outlets
     inserted = store.insert_articles([to_topic_row(a, slug) for a in fresh]) if fresh else 0
 
     digest_saved = False
