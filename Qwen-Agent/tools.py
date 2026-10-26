@@ -32,10 +32,11 @@ TOOL_SCHEMAS: List[dict] = [
         "name": "get_category_news",
         "description": "Current stories WITH short summaries from curated publisher feeds (TechCrunch, MIT Technology "
                        "Review, Ars Technica, BBC, Al Jazeera, VentureBeat and others). Use for AI and technology "
-                       "(tech), startups and funding (startups), and world affairs (geopolitics). Best choice for "
+                       "(tech), startups and funding (startups), world affairs (geopolitics), and health and medicine "
+                       "(health). Best choice for "
                        "'what is trending in AI/tech' style questions.",
         "parameters": {"type": "object", "properties": {
-            "category": {"type": "string", "enum": ["tech", "startups", "geopolitics"]},
+            "category": {"type": "string", "enum": ["tech", "startups", "geopolitics", "health"]},
             "limit": {"type": "integer", "description": "1-8, default 6"}},
             "required": ["category"]}}},
     {"type": "function", "function": {
@@ -165,7 +166,7 @@ class ToolRunner:
     def _category(self, args):
         cat = str(args.get("category", "")).lower()
         if cat not in sources.FEEDS_BY_CATEGORY:
-            return {"result": {"ok": False, "error": "category must be tech, startups or geopolitics."}, "event": None}
+            return {"result": {"ok": False, "error": "category must be tech, startups, geopolitics or health."}, "event": None}
         limit = max(1, min(int(args.get("limit") or 6), 8))
         items = _round_robin(self.fetch_category(cat), limit)
         stories = [{"title": a["title"][:140], "source": a.get("source", ""), "summary": a.get("summary", "")[:400],

@@ -1,6 +1,6 @@
 import { 
   X, Zap, ShieldCheck, FileText, PenTool, Github, Lock, 
-  Cpu, Globe, Rocket, Trophy, Shirt, LineChart, GraduationCap 
+  Cpu, Globe, Rocket, HeartPulse, Trophy, Shirt, LineChart, GraduationCap 
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -11,6 +11,7 @@ const categories: CategoryItem[] = [
   { id: 'tech', label: 'AI & Technology', icon: Cpu, locked: false },
   { id: 'geopolitics', label: 'Geopolitics', icon: Globe, locked: false },
   { id: 'startups', label: 'Startups & Funding', icon: Rocket, locked: false },
+  { id: 'health', label: 'Health', icon: HeartPulse, locked: false },
 
   // Coming Soon (Locked)
   { id: 'sports', label: 'Sports', icon: Trophy, locked: true },

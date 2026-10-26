@@ -1,6 +1,6 @@
 """News sources.
 
-* FEEDS_BY_CATEGORY: your original fixed category feeds (tech / geopolitics / startups).
+* FEEDS_BY_CATEGORY: your original fixed category feeds (tech / geopolitics / startups / health).
 * fetch_topic_articles(): NEW. Pulls headlines for ANY topic from the Google News RSS
   search feed. Free, no API key.
 """
@@ -31,6 +31,12 @@ FEEDS_BY_CATEGORY = {
         "https://venturebeat.com/feed/",
         "https://www.crunchbase.com/feed",
         "https://sifted.eu/feed",
+    ],
+    "health": [
+        "http://feeds.bbci.co.uk/news/health/rss.xml",
+        "https://www.statnews.com/feed/",
+        "https://www.theguardian.com/society/health/rss",
+        "https://www.who.int/rss-feeds/news-english.xml",
     ],
 }
 
