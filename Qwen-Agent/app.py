@@ -12,6 +12,8 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 import agent
+import breach_draft
+import candidates
 import digest
 import sources
 from config import Settings, load_settings
@@ -155,6 +157,55 @@ def create_app(settings: Settings = None, store: Store = None, llm: GroqClient =
         except Exception as e:
             traceback.print_exc()
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/breaches/candidates", methods=["GET", "OPTIONS"])
+    @limiter.limit("20 per hour")
+    def breach_candidates():
+        """Admin only. Lists breach stories from security feeds, grouped by story and ranked by how many
+        outlets cover them. Read-only: nothing is saved. Pick links and send them to /breaches/draft."""
+        if request.method == "OPTIONS":
+            return "", 200
+        if not has_pipeline_secret():
+            return jsonify({"error": "Unauthorized."}), 401
+        if store is None:
+            return jsonify({"error": "Database not configured."}), 500
+
+        def num(name, default, lo, hi):
+            try:
+                return max(lo, min(hi, int(request.args.get(name, default))))
+            except (TypeError, ValueError):
+                return default
+
+        try:
+            return jsonify(candidates.find_candidates(
+                store.breach_source_urls(), days=num("days", 7, 1, 30),
+                min_outlets=num("min_outlets", 1, 1, 5), limit=num("limit", 15, 1, 30)))
+        except Exception:
+            traceback.print_exc()
+            return jsonify({"error": "Could not load candidates right now."}), 502
+
+    @app.route("/breaches/draft", methods=["POST", "OPTIONS"])
+    @limiter.limit("10 per hour")
+    def draft_breach_card():
+        """Admin only. Reads the report links, drafts a breach card and saves it as a DRAFT.
+        The AI never publishes: you review the row in Supabase, then publish it yourself."""
+        if request.method == "OPTIONS":
+            return "", 200
+        if not has_pipeline_secret():
+            return jsonify({"error": "Unauthorized."}), 401
+        if store is None:
+            return jsonify({"error": "Database not configured."}), 500
+        data = request.get_json(silent=True) or {}
+        urls = data.get("urls")
+        if not isinstance(urls, list):
+            return jsonify({"error": "Send {\"urls\": [\"https://...\", ...]}."}), 400
+        try:
+            return jsonify(breach_draft.draft_breach(llm, store, s, urls, str(data.get("note") or ""))), 201
+        except breach_draft.DraftError as e:
+            return jsonify({"error": str(e)}), 422
+        except Exception:
+            traceback.print_exc()
+            return jsonify({"error": "Could not draft that card right now."}), 502
 
     return app
 

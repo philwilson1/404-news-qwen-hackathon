@@ -19,6 +19,9 @@ class Store:
     def insert_articles(self, rows: List[dict]) -> int: raise NotImplementedError
     def latest_digest(self, slug: str) -> Optional[dict]: raise NotImplementedError
     def save_digest(self, slug: str, topic: str, content: str, headlines: List[dict], model: str) -> None: raise NotImplementedError
+    def breach_slug_exists(self, slug: str) -> bool: raise NotImplementedError
+    def insert_breach(self, row: dict) -> None: raise NotImplementedError
+    def breach_source_urls(self) -> Set[str]: raise NotImplementedError
 
 
 def _now() -> str:
@@ -31,6 +34,7 @@ class MemoryStore(Store):
         self.subs: List[dict] = []
         self.articles: List[dict] = []
         self.digests: List[dict] = []
+        self.breaches: List[dict] = []
 
     def get_user_id(self, token):
         return self.tokens.get(token)
@@ -79,6 +83,16 @@ class MemoryStore(Store):
     def save_digest(self, slug, topic, content, headlines, model):
         self.digests.append({"slug": slug, "topic": topic, "content": content,
                              "headlines": headlines, "model": model, "created_at": _now()})
+
+
+    def breach_slug_exists(self, slug):
+        return any(b["slug"] == slug for b in self.breaches)
+
+    def insert_breach(self, row):
+        self.breaches.append(dict(row))
+
+    def breach_source_urls(self):
+        return {x.get("url") for b in self.breaches for x in (b.get("sources") or []) if x.get("url")}
 
 
 class SupabaseStore(Store):
@@ -154,3 +168,14 @@ class SupabaseStore(Store):
         self.db.table("topic_digests").insert({
             "slug": slug, "topic": topic, "content": content, "headlines": headlines,
             "article_count": len(headlines), "model": model}).execute()
+
+    def breach_slug_exists(self, slug):
+        res = self.db.table("breaches").select("id").eq("slug", slug).limit(1).execute()
+        return bool(res.data)
+
+    def insert_breach(self, row):
+        self.db.table("breaches").insert(row).execute()
+
+    def breach_source_urls(self):
+        res = self.db.table("breaches").select("sources").execute()
+        return {x.get("url") for r in (res.data or []) for x in (r.get("sources") or []) if x.get("url")}
