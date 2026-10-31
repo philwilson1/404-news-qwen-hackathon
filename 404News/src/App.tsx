@@ -7,6 +7,7 @@ import AIView from './components/AIView';
 import TopicsView from './components/TopicsView';
 import ProfileView from './components/ProfileView';
 import BookmarksView from './components/BookmarksView';
+import CyberView from './components/CyberView';
 import SearchView from './components/SearchView'; // 1. Import SearchView
 import Toast, { type ToastState } from './components/Toast';
 import AuthView from './components/AuthView';
@@ -82,7 +83,7 @@ function App() {
             <BookmarksView onBack={() => setShowBookmarks(false)} />
           ) : (
             <>
-              {activeTab === 'feed' && <FeedView category={activeCategory} />}
+              {activeTab === 'feed' && (activeCategory === 'cyber' ? <CyberView /> : <FeedView category={activeCategory} />)}
               {activeTab === 'following' && <TopicsView />}
               {activeTab === 'ai' && <AIView />}
               {activeTab === 'profile' && (

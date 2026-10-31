@@ -462,3 +462,31 @@ export async function fetchBookmarkedArticles(): Promise<Article[]> {
     return [];
   }
 }
+// ---- Cybersecurity breach library ------------------------------------------------------
+export interface BreachStage { stage: string; detail?: string | null; attack_ids?: string[]; soc_view?: string | null; }
+export interface BreachSource { title: string; url: string; }
+export interface Breach {
+  id: string; slug: string; status: 'draft' | 'reviewed' | 'published';
+  headline: string; source_label: string; occurred_on: string | null;
+  what_happened: string; affected: string; what_to_do: string;
+  attacker: string | null; attacker_assessed_by: string | null;
+  attack_chain: BreachStage[]; lessons: string[];
+  root_cause: 'confirmed' | 'unconfirmed'; sources: BreachSource[];
+  last_checked_on: string; created_at: string;
+}
+
+// The database already hides drafts from readers; the status filter makes that explicit here too.
+export async function fetchPublishedBreaches(): Promise<Breach[]> {
+  try {
+    const { data, error } = await supabase
+      .from('breaches')
+      .select('*')
+      .eq('status', 'published')
+      .order('occurred_on', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+    if (error) { console.error('Error fetching breaches:', error); return []; }
+    return (data as Breach[]) || [];
+  } catch {
+    return [];
+  }
+}
